@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>贝塔科技 智能面试枢纽</title>
+  <!-- 引入 Tailwind CSS 进行极速样式渲染 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入 FontAwesome 图标库 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- 引入 React 核心库 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- 引入 Babel 用于在浏览器实时编译 React 代码 -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+    .animate-fadeInUp { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React 业务代码 -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const DEFAULT_SKILLS = [
+      { id: 1, type: 'hard', name: 'AI工具实操与落地', rubric: `* 优秀 (4-5分)：拥有清晰的“AI辅助管线”思维。能组合多工具解决实际问题，有明确提效数据。\n* 及格 (3分)：频繁使用基础聊天类AI辅助代码或润色，能更换Prompt解决卡点。\n* 较差 (1-2分)：把AI当高级百度，仅查资料，无深度生成概念。\n* 未识别：完全未提及AI实操细节。` },
+      { id: 2, type: 'hard', name: '游戏系统/数值拆解', rubric: `* 优秀 (4-5分)：拆解极具深度，直击商业化底层、数值循环。迭代方案极具落地性。\n* 及格 (3分)：能找出核心机制，有条理分析优缺点。\n* 较差 (1-2分)：纯主观玩家视角，缺乏逻辑框架。\n* 未识别：未提及游戏拆解与迭代。` },
+      { id: 3, type: 'soft', name: 'AI拥抱度与深度', rubric: `* 5分：沉淀了专属AI工具流(如本地部署、自动化脚本)。\n* 4分：能用AI跨专业解决复杂难题。\n* 3分：停留在对话框一问一答层面。\n* 1-2分：极少使用，缺乏工具化思维。` },
+      { id: 4, type: 'soft', name: '自驱力与落地精神', rubric: `* 5分：破壁者，极度缺乏资源下死磕交付专业成果。\n* 4分：无指令自发完成完整项目，克服了技术阻碍。\n* 3分：能完成指派任务，缺乏主动优化。\n* 1-2分：被动，推一下走一下。` },
+      { id: 5, type: 'soft', name: '游戏热爱度', rubric: `* 5分：硬核数据(极高时长/重氪)，具备专业底盘思维。\n* 4分：对某几类商业化游戏有深度沉淀。\n* 3分：纯娱乐玩家。\n* 1-2分：经历单一或无数据。` },
+      { id: 6, type: 'soft', name: '抗压韧性', rubric: `* 4-5分：有“极限死磕/崩溃修复”经历，应对负面反馈情绪稳定。\n* 3分：能按时交付，应对常规压力。\n* 1-2分：遇阻容易放弃，情绪崩溃。` },
+      { id: 7, type: 'soft', name: '成就动机', rubric: `* 4-5分：极强目标导向，追求卓越(拿奖/技术突破)。\n* 3分：关注个人职业成长。\n* 1-2分：仅为混一份实习。` },
+    ];
+
+    const DEFAULT_POSITIONS = [
+      { id: 1, name: 'AI策划实习生 (默认严苛版)', description: '针对26届培养岗，重自驱与AI深度', skillIds: [1, 2, 3, 4, 5, 6, 7] }
+    ];
+
+    const BASE_SYSTEM_PROMPT = `# Role\n你是一位就职于“北京贝塔科技”的资深游戏制作人兼主策划。任务是根据提供的【候选人简历】与【面试录音】，运用设定的【岗位素质模型】，客观、犀利、极度严格地评估候选人。\n\n# Task (核心纪律要求)\n1. 角色隔离防污染：绝不能将面试官的观点误认作候选人的产出。只评估独立表达内容！基于STAR法则深挖真实动机和卡点。\n2. 绝对客观防脑补：如果某项能力未提及或只有空洞套话，直接标记为“未识别”。必须有具体工具名、数据、卡点佐证。\n3. 严禁分数通胀：不轻易给5分！5分代表Top 5%的顶尖水平。必须有极具说服力的客观事实才能给4-5分。\n\n# 🧮 录用判定核心算法\n* 淘汰 (C)：显性技能中出现【较差】，或软素质中出现【1分/2分】。\n* 待定 (B)：统计所有“未识别”数量。如果【未识别】 > 1 个，触发熔断判定为待定。\n* 录用 (A/S)：未触碰红线且【未识别】 ≤ 1 个。且所有软素质 ≥ 3分。若两项以上5分则给S，否则给A。\n\n# Output Format\n请严格使用以下 Markdown 格式输出：\n\n### 📊 核心结论速览\n| 候选人姓名 | 最终判定 | 未识别项数 | 核心评语 (限50字内) |\n| ----- | ----- | ----- | ----- |\n| (自动提取) | S/A/B/C | N | 简要总结 |\n\n---\n### 📝 详细评估报告 (佐证记录区)\n#### 👤 1. 候选人基本画像\n#### 🧊 2. 冰山之上：知识与技能评估\n#### 🌊 3. 冰山之下：软性素质评估\n#### 💡 4. 优劣势与风险提示\n#### 🏁 5. 综合决策复盘`;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('assessment'); 
+      const loadState = (key, defaultVal) => {
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : defaultVal;
+      };
+
+      const [skills, setSkills] = useState(() => loadState('beta_skills', DEFAULT_SKILLS));
+      const [positions, setPositions] = useState(() => loadState('beta_positions', DEFAULT_POSITIONS));
+      const [evaluations, setEvaluations] = useState(() => loadState('beta_evaluations', []));
+
+      useEffect(() => { localStorage.setItem('beta_skills', JSON.stringify(skills)); }, [skills]);
+      useEffect(() => { localStorage.setItem('beta_positions', JSON.stringify(positions)); }, [positions]);
+      useEffect(() => { localStorage.setItem('beta_evaluations', JSON.stringify(evaluations)); }, [evaluations]);
+
+      const [showApiSettings, setShowApiSettings] = useState(false);
+      const [llmProvider, setLlmProvider] = useState(localStorage.getItem('llm_provider') || 'deepseek');
+      const [apiKeys, setApiKeys] = useState({
+        gemini: localStorage.getItem('gemini_api_key') || '',
+        openai: localStorage.getItem('openai_api_key') || '',
+        deepseek: localStorage.getItem('deepseek_api_key') || ''
+      });
+
+      const [newSkill, setNewSkill] = useState({ type: 'hard', name: '', rubric: '' });
+      const [genPosName, setGenPosName] = useState('');
+      const [genHardSkills, setGenHardSkills] = useState('');
+      const [genSoftSkills, setGenSoftSkills] = useState('');
+      const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+      const [draftPosition, setDraftPosition] = useState(null); 
+      const [refinePrompt, setRefinePrompt] = useState(''); 
+      const [isRefining, setIsRefining] = useState(false);
+      const [manualPosition, setManualPosition] = useState({ name: '', description: '', skillIds: [] });
+
+      const [selectedPosId, setSelectedPosId] = useState(1);
+      const [candidateName, setCandidateName] = useState('');
+      const [resumeText, setResumeText] = useState('');
+      const [interviewText, setInterviewText] = useState('');
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [reportResult, setReportResult] = useState('');
+      const [currentRating, setCurrentRating] = useState('');
+
+      const fileInputResumeRef = useRef(null);
+      const fileInputInterviewRef = useRef(null);
+
+      const callLLM = async (systemPrompt, userPrompt, temperature = 0.2, parseJson = false) => {
+        const currentKey = apiKeys[llmProvider];
+        if (!currentKey) throw new Error(`请先配置 ${llmProvider.toUpperCase()} API Key`);
+
+        if (llmProvider === 'gemini') {
+          const payload = { contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }] };
+          if (parseJson) payload.generationConfig = { responseMimeType: "application/json" };
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${currentKey}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`Gemini Error: ${res.status}`);
+          const data = await res.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text;
+        } else {
+          const endpoint = llmProvider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.deepseek.com/chat/completions';
+          const modelName = llmProvider === 'openai' ? 'gpt-4o' : 'deepseek-chat';
+          const payload = {
+            model: modelName,
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+            temperature: temperature
+          };
+          if (parseJson && llmProvider === 'openai') payload.response_format = { type: "json_object" };
+          const res = await fetch(endpoint, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`${llmProvider} Error: ${res.status}`);
+          const data = await res.json();
+          return data.choices?.[0]?.message?.content;
+        }
+      };
+
+      const handleFileUpload = (e, setTextField) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+          const reader = new FileReader();
+          reader.onload = (event) => setTextField((prev) => prev + "\n" + event.target.result);
+          reader.readAsText(file);
+        } else alert("仅支持 .txt 或 .md 纯文本文件。\nPDF/Word请手工粘贴。");
+        e.target.value = null;
+      };
+
+      const generateInitialDraft = async () => {
+        if (!genPosName || !genHardSkills || !genSoftSkills) return alert("请填写完整要求！");
+        setIsGeneratingDraft(true);
+        try {
+          const sysPrompt = `你是一个资深HR架构师。根据用户提供的【岗位名称】、【硬技能】和【软素质】，生成符合“冰山模型”的评分标准。返回合法JSON对象，不要带markdown标记：\n{ "name": "岗位名称", "description": "一句话描述", "skills": [ { "type": "hard或soft", "name": "...", "rubric": "* 4-5分：...\\n* 3分：...\\n* 1-2分：..." } ] }`;
+          const resText = await callLLM(sysPrompt, `岗位：${genPosName}\n硬技能：${genHardSkills}\n软素质：${genSoftSkills}`, 0.3, true);
+          setDraftPosition(JSON.parse(resText.replace(/```json/gi, '').replace(/```/g, '').trim()));
+        } catch (err) { alert("生成失败：" + err.message); } finally { setIsGeneratingDraft(false); }
+      };
+
+      const handleRefineDraft = async () => {
+        if (!refinePrompt || !draftPosition) return;
+        setIsRefining(true);
+        try {
+          const sysPrompt = `你是一个资深HR架构师。根据用户的修改意见调整草稿，保持严苛风格，返回合法 JSON。`;
+          const resText = await callLLM(sysPrompt, `【当前草稿】：\n${JSON.stringify(draftPosition)}\n【修改意见】：\n${refinePrompt}`, 0.2, true);
+          setDraftPosition(JSON.parse(resText.replace(/```json/gi, '').replace(/```/g, '').trim()));
+          setRefinePrompt(''); 
+        } catch (err) { alert("调整失败：" + err.message); } finally { setIsRefining(false); }
+      };
+
+      const confirmAndSaveDraft = () => {
+        if (!draftPosition) return;
+        let newSkillIds = [];
+        let updatedSkills = [...skills];
+        draftPosition.skills.forEach(dSkill => {
+          const existing = updatedSkills.find(s => s.name === dSkill.name);
+          if (existing) newSkillIds.push(existing.id);
+          else {
+            const newId = Date.now() + Math.floor(Math.random() * 10000);
+            updatedSkills.push({ id: newId, type: dSkill.type, name: dSkill.name, rubric: dSkill.rubric });
+            newSkillIds.push(newId);
+          }
+        });
+        setSkills(updatedSkills);
+        setPositions([...positions, { id: Date.now(), name: draftPosition.name, description: draftPosition.description, skillIds: newSkillIds }]);
+        setDraftPosition(null); setGenPosName(''); setGenHardSkills(''); setGenSoftSkills('');
+        alert("画像生成并入库成功！新标准已沉淀至【能力库】。");
+      };
+
+      const generateReport = async () => {
+        if (!candidateName || (!resumeText && !interviewText)) return alert("请填写资料。");
+        const position = positions.find(p => p.id === Number(selectedPosId));
+        if (!position) return;
+        const posSkills = position.skillIds.map(id => skills.find(s => s.id === id)).filter(Boolean);
+        let dynamicRubric = `# 评估标准：${position.name}\n## 🧊 知识与技能\n`;
+        posSkills.filter(s => s.type === 'hard').forEach((s, i) => dynamicRubric += `**${i+1}. ${s.name}**\n${s.rubric}\n\n`);
+        dynamicRubric += `## 🌊 软性素质\n`;
+        posSkills.filter(s => s.type === 'soft').forEach((s, i) => dynamicRubric += `**${i+1}. ${s.name}**\n${s.rubric}\n\n`);
+        
+        setIsGenerating(true); setReportResult('');
+        try {
+          const resText = await callLLM(BASE_SYSTEM_PROMPT, `${dynamicRubric}\n\n# 候选人\n【姓名】：${candidateName}\n【简历】：${resumeText}\n【录音】：${interviewText}`, 0.2);
+          setReportResult(resText || "未返回有效文本");
+          const match = resText.match(/\|\s*S\/A\/B\/C\s*\|\s*([SABC])/i) || resText.match(/\|\s*([^|]+)\s*\|\s*([SABC])\s*\|/);
+          setCurrentRating(match ? match[match.length - 1].toUpperCase() : '未知');
+        } catch (err) { setReportResult(`发生错误: ${err.message}`); } finally { setIsGenerating(false); }
+      };
+
+      const saveToArchive = () => {
+        const pos = positions.find(p => p.id === Number(selectedPosId));
+        setEvaluations([{ id: Date.now(), date: new Date().toLocaleDateString(), candidateName, positionName: pos?.name||'未知', rating: currentRating, reportResult }, ...evaluations]);
+        alert("收录成功！");
+      };
+
+      const exportCSV = () => {
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF评估日期,候选人姓名,应聘岗位,最终判定\n";
+        evaluations.forEach(e => csvContent += `${e.date},${e.candidateName},${e.positionName},${e.rating}\n`);
+        const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `台账.csv`);
+        document.body.appendChild(link); link.click(); link.remove();
+      };
+
+      const handleDeleteItem = (id, type) => {
+        if (type === 'skill') { setSkills(skills.filter(s => s.id !== id)); setPositions(positions.map(p => ({ ...p, skillIds: p.skillIds.filter(sid => sid !== id) }))); }
+        else if (type === 'position') { if (positions.length <= 1) return alert("保留至少一个"); setPositions(positions.filter(p => p.id !== id)); }
+        else if (type === 'eval') setEvaluations(evaluations.filter(e => e.id !== id));
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-gray-800">
+          <header className="bg-slate-900 text-white p-4 shadow-md flex justify-between items-center z-10 sticky top-0">
+            <div className="flex items-center space-x-3">
+              <i className="fa-solid fa-wand-magic-sparkles text-blue-400 text-2xl"></i>
+              <h1 className="text-xl font-bold">BetaTech 智能面试枢纽</h1>
+            </div>
+            <div className="flex space-x-2">
+              <button onClick={() => setActiveTab('assessment')} className={`px-4 py-2 rounded-lg font-bold flex items-center ${activeTab==='assessment'?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-800'}`}><i className="fa-solid fa-circle-play mr-2"></i> 工作台</button>
+              <button onClick={() => setActiveTab('archives')} className={`px-4 py-2 rounded-lg font-bold flex items-center ${activeTab==='archives'?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-800'}`}><i className="fa-solid fa-box-archive mr-2"></i> 档案</button>
+              <button onClick={() => setActiveTab('positions')} className={`px-4 py-2 rounded-lg font-bold flex items-center ${activeTab==='positions'?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-800'}`}><i className="fa-solid fa-briefcase mr-2"></i> 岗位画像</button>
+              <button onClick={() => setActiveTab('skills')} className={`px-4 py-2 rounded-lg font-bold flex items-center ${activeTab==='skills'?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-800'}`}><i className="fa-solid fa-layer-group mr-2"></i> 能力库</button>
+              <button onClick={() => setShowApiSettings(true)} className="px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300"><i className="fa-solid fa-gear text-xl"></i></button>
+            </div>
+          </header>
+
+          {showApiSettings && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md animate-fadeIn">
+                <h2 className="text-xl font-bold mb-5 flex items-center"><i className="fa-solid fa-microchip mr-2 text-blue-600"></i> 模型配置</h2>
+                <select value={llmProvider} onChange={(e) => setLlmProvider(e.target.value)} className="w-full border-2 rounded-lg p-2.5 mb-4 outline-none">
+                  <option value="deepseek">DeepSeek (性价比/逻辑首选)</option>
+                  <option value="openai">OpenAI (GPT-4o 全能)</option>
+                  <option value="gemini">Google Gemini (长文本)</option>
+                </select>
+                <input type="password" value={apiKeys[llmProvider]} onChange={(e) => setApiKeys({...apiKeys, [llmProvider]: e.target.value})} className="w-full border-2 rounded-lg p-2.5 mb-2" placeholder={`${llmProvider.toUpperCase()} API Key`} />
+                <p className="text-xs text-gray-400 mb-6">本地安全存储，绝不上传外部服务器。</p>
+                <div className="flex justify-end space-x-3">
+                  <button onClick={() => setShowApiSettings(false)} className="px-4 py-2 hover:bg-gray-100 rounded-lg">取消</button>
+                  <button onClick={() => { localStorage.setItem('llm_provider', llmProvider); localStorage.setItem(`${llmProvider}_api_key`, apiKeys[llmProvider]); setShowApiSettings(false); }} className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600"><i className="fa-solid fa-floppy-disk mr-2"></i> 保存</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+            {/* 工作台 */}
+            {activeTab === 'assessment' && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                  <h2 className="text-xl font-bold mb-6 flex items-center border-b pb-4"><i className="fa-solid fa-bullseye mr-2 text-blue-600"></i> 画像与资料录入</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div><label className="block text-sm font-bold mb-2">1. 选择岗位</label><select value={selectedPosId} onChange={(e) => setSelectedPosId(e.target.value)} className="w-full border-2 rounded-xl p-3 bg-blue-50/30 outline-none">{positions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+                    <div><label className="block text-sm font-bold mb-2">2. 候选人姓名</label><input type="text" value={candidateName} onChange={e=>setCandidateName(e.target.value)} className="w-full border-2 rounded-xl p-3 outline-none" /></div>
+                  </div>
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-slate-50 p-2 rounded-xl border border-gray-200 flex flex-col">
+                      <div className="flex justify-between items-center mb-2 px-1">
+                        <label className="text-sm font-bold"><i className="fa-solid fa-file-lines mr-1 text-indigo-500"></i> 简历文本</label>
+                        <button onClick={() => fileInputResumeRef.current.click()} className="text-xs text-gray-600 hover:text-blue-600 bg-white px-2 py-1 rounded border shadow-sm"><i className="fa-solid fa-upload"></i> 导入txt</button>
+                        <input type="file" ref={fileInputResumeRef} className="hidden" onChange={(e) => handleFileUpload(e, setResumeText)} />
+                      </div>
+                      <textarea value={resumeText} onChange={e=>setResumeText(e.target.value)} className="w-full flex-1 h-48 p-3 rounded-lg border outline-none text-sm custom-scrollbar"></textarea>
+                    </div>
+                    <div className="bg-slate-50 p-2 rounded-xl border border-gray-200 flex flex-col">
+                      <div className="flex justify-between items-center mb-2 px-1">
+                        <label className="text-sm font-bold"><i className="fa-solid fa-circle-play mr-1 text-emerald-500"></i> 面试录音文本</label>
+                        <button onClick={() => fileInputInterviewRef.current.click()} className="text-xs text-gray-600 hover:text-blue-600 bg-white px-2 py-1 rounded border shadow-sm"><i className="fa-solid fa-upload"></i> 导入txt</button>
+                        <input type="file" ref={fileInputInterviewRef} className="hidden" onChange={(e) => handleFileUpload(e, setInterviewText)} />
+                      </div>
+                      <textarea value={interviewText} onChange={e=>setInterviewText(e.target.value)} className="w-full flex-1 h-48 p-3 rounded-lg border outline-none text-sm custom-scrollbar"></textarea>
+                    </div>
+                  </div>
+                  <div className="mt-8 flex justify-center">
+                    <button onClick={generateReport} disabled={isGenerating} className={`px-12 py-4 rounded-xl font-bold text-white shadow-lg text-lg ${isGenerating ? 'bg-blue-400' : 'bg-slate-900 hover:bg-blue-600'}`}>
+                      {isGenerating ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i> 模型研判中...</> : <><i className="fa-solid fa-microchip mr-2"></i> 开始智能打分</>}
+                    </button>
+                  </div>
+                </div>
+                {reportResult && (
+                   <div className="bg-white p-6 rounded-2xl shadow-2xl border-t-4 border-blue-600 mt-6 animate-fadeInUp">
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                      <h2 className="text-2xl font-bold flex items-center"><i className="fa-solid fa-file-lines mr-2 text-blue-600"></i> 判定报告</h2>
+                      <div className="flex space-x-3">
+                        <button onClick={saveToArchive} className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-bold text-sm shadow-sm"><i className="fa-solid fa-box-archive mr-2"></i> 收录台账</button>
+                        <button onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([reportResult], { type: 'text/markdown' })); a.download = `${candidateName}.md`; a.click(); }} className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm shadow"><i className="fa-solid fa-file-arrow-up mr-2"></i> 下载 Markdown</button>
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-6 rounded-xl border border-gray-200 font-mono text-sm whitespace-pre-wrap">{reportResult}</div>
+                   </div>
+                )}
+              </div>
+            )}
+
+            {/* 岗位画像 */}
+            {activeTab === 'positions' && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="bg-slate-900 p-6 rounded-2xl shadow-lg text-white">
+                   <h2 className="text-xl font-bold mb-2"><i className="fa-solid fa-wand-magic-sparkles mr-2 text-indigo-400"></i> AI 智能画像建库引擎</h2>
+                   {!draftPosition ? (
+                     <div className="space-y-4">
+                       <input value={genPosName} onChange={e=>setGenPosName(e.target.value)} placeholder="岗位名称 (例：海外数值策划)" className="w-full bg-slate-800 border border-indigo-500/30 rounded-xl p-3 outline-none" />
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <textarea value={genHardSkills} onChange={e=>setGenHardSkills(e.target.value)} placeholder="关键硬技能 (逗号分隔)" className="w-full bg-slate-800 border border-indigo-500/30 rounded-xl p-3 h-24 outline-none"></textarea>
+                         <textarea value={genSoftSkills} onChange={e=>setGenSoftSkills(e.target.value)} placeholder="核心软素质 (逗号分隔)" className="w-full bg-slate-800 border border-indigo-500/30 rounded-xl p-3 h-24 outline-none"></textarea>
+                       </div>
+                       <button onClick={generateInitialDraft} disabled={isGeneratingDraft} className="bg-indigo-600 px-8 py-3 rounded-xl font-bold shadow-lg">
+                          {isGeneratingDraft ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i> 生成中...</> : "生成评分标准体系"}
+                       </button>
+                     </div>
+                   ) : (
+                     <div className="bg-white text-slate-800 rounded-xl p-6 shadow-2xl mt-4">
+                       <h3 className="text-lg font-bold text-indigo-700 mb-4 border-b pb-2"><i className="fa-solid fa-square-check mr-2"></i> 草稿：{draftPosition.name}</h3>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 h-64 overflow-y-auto custom-scrollbar">
+                         <div>
+                           <h4 className="font-bold text-blue-700 mb-2">🧊 硬技能</h4>
+                           {draftPosition.skills.filter(s=>s.type==='hard').map((s,i)=><div key={i} className="mb-3 pl-2 border-l-2 border-blue-300"><b className="text-sm">{s.name}</b><p className="text-xs text-gray-600 whitespace-pre-wrap">{s.rubric}</p></div>)}
+                         </div>
+                         <div>
+                           <h4 className="font-bold text-emerald-700 mb-2">🌊 软素质</h4>
+                           {draftPosition.skills.filter(s=>s.type==='soft').map((s,i)=><div key={i} className="mb-3 pl-2 border-l-2 border-emerald-300"><b className="text-sm">{s.name}</b><p className="text-xs text-gray-600 whitespace-pre-wrap">{s.rubric}</p></div>)}
+                         </div>
+                       </div>
+                       <div className="bg-slate-50 p-4 rounded-xl flex space-x-3 mb-4">
+                         <input value={refinePrompt} onChange={e=>setRefinePrompt(e.target.value)} placeholder="输入修改要求让 AI 调整..." className="flex-1 border-2 rounded-lg p-2 text-sm outline-none" />
+                         <button onClick={handleRefineDraft} disabled={isRefining} className="bg-slate-800 text-white px-6 py-2 rounded-lg font-bold">
+                           {isRefining ? <i className="fa-solid fa-spinner fa-spin"></i> : "提交修改"}
+                         </button>
+                       </div>
+                       <div className="flex justify-end pt-3 border-t">
+                         <button onClick={()=>setDraftPosition(null)} className="px-5 py-2 mr-3 text-gray-500">重新生成</button>
+                         <button onClick={confirmAndSaveDraft} className="px-8 py-2 bg-indigo-600 text-white font-bold rounded-lg">满意，入库并沉淀能力</button>
+                       </div>
+                     </div>
+                   )}
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
+                   <h2 className="text-base font-bold p-5 bg-slate-50 border-b"><i className="fa-solid fa-briefcase mr-2 text-slate-500"></i> 已沉淀画像库 ({positions.length})</h2>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5">
+                     {positions.map(pos => (
+                       <div key={pos.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-lg relative group bg-white">
+                         <h3 className="font-bold mb-1">{pos.name}</h3><p className="text-xs text-gray-500 mb-3 truncate">{pos.description||'系统沉淀'}</p>
+                         <div className="flex flex-wrap gap-1">
+                           {pos.skillIds.map(id => {
+                             const s = skills.find(sk => sk.id === id);
+                             return s ? <span key={id} className={`text-[10px] px-1.5 py-0.5 rounded border ${s.type==='hard'?'bg-indigo-50 text-indigo-700':'bg-emerald-50 text-emerald-700'}`}>{s.name}</span> : null;
+                           })}
+                         </div>
+                         <button onClick={() => handleDeleteItem(pos.id, 'position')} className="absolute top-3 right-3 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><i className="fa-solid fa-trash-can"></i></button>
+                       </div>
+                     ))}
+                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* 档案 */}
+            {activeTab === 'archives' && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 animate-fadeIn">
+                <div className="flex justify-between items-center border-b pb-4 mb-4">
+                   <h2 className="text-xl font-bold"><i className="fa-solid fa-box-archive mr-2 text-indigo-600"></i> 评估档案台账</h2>
+                   <button onClick={exportCSV} className="px-5 py-2 bg-green-50 text-green-700 rounded-lg font-bold text-sm"><i className="fa-solid fa-download mr-2"></i> 导出 CSV</button>
+                </div>
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-gray-600"><tr><th className="p-3">日期</th><th className="p-3">姓名</th><th className="p-3">岗位</th><th className="p-3">评级</th><th className="p-3">操作</th></tr></thead>
+                  <tbody>
+                    {evaluations.map(ev => (
+                      <tr key={ev.id} className="border-b">
+                        <td className="p-3">{ev.date}</td><td className="p-3 font-bold">{ev.candidateName}</td><td className="p-3">{ev.positionName}</td><td className="p-3 font-bold text-blue-600">{ev.rating}</td>
+                        <td className="p-3"><button onClick={() => handleDeleteItem(ev.id, 'eval')} className="text-red-400"><i className="fa-solid fa-trash-can"></i></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 能力库 */}
+            {activeTab === 'skills' && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 animate-fadeIn">
+                 <h2 className="text-xl font-bold mb-4"><i className="fa-solid fa-layer-group mr-2 text-slate-500"></i> 原子能力池 ({skills.length}项)</h2>
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {skills.map(skill => (
+                      <div key={skill.id} className="border rounded-xl p-4 relative group">
+                        <span className="text-[10px] px-2 py-1 bg-gray-100 rounded">{skill.type==='hard'?'硬技能':'软素质'}</span>
+                        <h3 className="font-bold mt-2 mb-2">{skill.name}</h3>
+                        <p className="text-xs text-gray-600 whitespace-pre-wrap h-24 overflow-y-auto custom-scrollbar">{skill.rubric}</p>
+                        <button onClick={() => handleDeleteItem(skill.id, 'skill')} className="absolute top-3 right-3 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><i className="fa-solid fa-trash-can"></i></button>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
