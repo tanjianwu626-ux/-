@@ -28,6 +28,9 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
   </script>
 
+  <!-- 引入 marked.js 用于美化 Markdown 报告的渲染 -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
   <style>
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
@@ -36,6 +39,24 @@
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+    
+    /* 极致美化的报告渲染样式 */
+    .markdown-container { color: #334155; font-size: 0.95rem; line-height: 1.7; }
+    .markdown-container h1 { font-size: 1.5rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 1rem; color: #1e3a8a; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+    .markdown-container h1:first-child { margin-top: 0; }
+    .markdown-container h2 { font-size: 1.25rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #2563eb; }
+    .markdown-container h3 { font-size: 1.125rem; font-weight: 700; margin-top: 1.25rem; margin-bottom: 0.5rem; color: #3b82f6; }
+    .markdown-container h4 { font-size: 1rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #475569; }
+    .markdown-container p { margin-bottom: 1rem; }
+    .markdown-container ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #475569; }
+    .markdown-container ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; color: #475569; }
+    .markdown-container li { margin-bottom: 0.35rem; }
+    .markdown-container strong { color: #0f172a; font-weight: bold; background-color: #fef08a; padding: 0 4px; border-radius: 4px; }
+    .markdown-container table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .markdown-container th, .markdown-container td { border: 1px solid #e2e8f0; padding: 0.75rem 1rem; text-align: left; }
+    .markdown-container th { background-color: #f8fafc; font-weight: bold; color: #1e293b; }
+    .markdown-container tr:nth-child(even) { background-color: #f8fafc; }
+    .markdown-container blockquote { border-left: 4px solid #3b82f6; background-color: #eff6ff; padding: 1rem; margin-bottom: 1rem; border-radius: 0 0.5rem 0.5rem 0; color: #1e40af; font-style: italic; }
   </style>
 </head>
 <body class="bg-slate-50">
@@ -84,7 +105,6 @@
       useEffect(() => { localStorage.setItem('beta_evaluations', JSON.stringify(evaluations)); }, [evaluations]);
 
       const [showApiSettings, setShowApiSettings] = useState(false);
-      // 默认切换为硅基流动作为首选
       const [llmProvider, setLlmProvider] = useState(localStorage.getItem('llm_provider') || 'siliconflow');
       
       const [apiKeys, setApiKeys] = useState({
@@ -133,10 +153,14 @@
       const [isGenerating, setIsGenerating] = useState(false);
       const [reportResult, setReportResult] = useState('');
       const [currentRating, setCurrentRating] = useState('');
+      const [currentParsedScores, setCurrentParsedScores] = useState(null);
+
+      // 新增：用于在档案库打开详情弹窗
+      const [selectedEval, setSelectedEval] = useState(null);
 
       const [manualPosition, setManualPosition] = useState({ name: '', description: '', skillIds: [] });
 
-      // 安全擦除功能 (包含所有新增平台)
+      // 安全擦除功能
       const clearSecurityData = () => {
         if(window.confirm("确定要擦除浏览器本地保存的所有 API 配置信息吗？擦除后需要重新输入。")) {
            ['azure', 'deepseek', 'openai', 'gemini', 'siliconflow'].forEach(provider => {
@@ -200,13 +224,9 @@
 
           const res = await fetch(endpoint, {
             method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json', 
-              'api-key': currentKey
-            },
+            headers: { 'Content-Type': 'application/json', 'api-key': currentKey },
             body: JSON.stringify(payload)
           });
-
           if (!res.ok) {
             if (res.status === 401) throw new Error("401 未授权：请检查 API Key 是否正确填写，不能有多余空格。");
             if (res.status === 404) throw new Error("404 找不到部署：请核对 Deployment Name 是否拼写正确。");
@@ -216,7 +236,6 @@
           return data.choices?.[0]?.message?.content;
 
         } else if (llmProvider === 'siliconflow') {
-          // 硅基流动专用通道
           const baseUrl = (apiBaseUrls.siliconflow.trim() || 'https://api.siliconflow.cn/v1').replace(/\/$/, '') + '/chat/completions';
           const payload = {
             model: siliconflowModel.trim() || 'deepseek-ai/DeepSeek-V3',
@@ -226,8 +245,7 @@
           if (parseJson) payload.response_format = { type: "json_object" };
           
           const res = await fetch(baseUrl, {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
             body: JSON.stringify(payload)
           });
           if (!res.ok) throw new Error(`硅基流动 API 错误 ${res.status}：Key无效或余额不足。`);
@@ -235,7 +253,6 @@
           return data.choices?.[0]?.message?.content;
 
         } else {
-          // OpenAI / DeepSeek
           let endpoint = (llmProvider === 'openai' ? (apiBaseUrls.openai.trim() || 'https://api.openai.com') : (apiBaseUrls.deepseek.trim() || 'https://api.deepseek.com')).replace(/\/$/, '') + (llmProvider === 'openai' ? '/v1/chat/completions' : '/chat/completions');
           const payload = {
             model: llmProvider === 'openai' ? 'gpt-4o' : 'deepseek-chat',
@@ -245,8 +262,7 @@
           if (parseJson && llmProvider === 'openai') payload.response_format = { type: "json_object" };
           
           const res = await fetch(endpoint, {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
             body: JSON.stringify(payload)
           });
           if (!res.ok) throw new Error(`API 错误 ${res.status}：Key无效或未授权。`);
@@ -259,31 +275,67 @@
         setIsTesting(true);
         setTestResult({ status: 'testing', message: '🚀 正在呼叫服务器进行握手测试...' });
         try {
-          const systemPrompt = "Reply 'OK'";
-          const userPrompt = "Ping";
-          const resText = await callLLM(systemPrompt, userPrompt, 0.1);
-          if (resText) {
-            setTestResult({ status: 'success', message: '🎉 通道测通成功！API 正常工作，随时可以开始评估打分。' });
-          } else {
-            setTestResult({ status: 'warning', message: '收到响应但内容为空，可能存在异常。' });
-          }
+          const resText = await callLLM("Reply 'OK'", "Ping", 0.1);
+          if (resText) setTestResult({ status: 'success', message: '🎉 通道测通成功！API 正常工作，随时可以开始评估打分。' });
+          else setTestResult({ status: 'warning', message: '收到响应但内容为空，可能存在异常。' });
         } catch (err) {
-          console.error(err);
           let message = err.message;
           if (message.includes('Failed to fetch') || message.includes('TypeError')) {
-             if (llmProvider === 'azure') {
-               message = `❌ 拦截警报 (Failed to fetch)：\n微软 Azure 的门卫阻止了本次请求 (CORS 拦截)。\n\n【解决方案】：\n请登录 Azure 后台 -> 找到您的模型资源 -> 左侧点击「资源管理(Resource Management)」-> 点击「CORS」-> 在"允许的源(Allowed origins)"中填入 * 或您的 GitHub 网址 -> 保存即可测通！`;
-             } else {
-               message = `❌ 无法连接服务器 (Failed to fetch)：\n这可能是因为网络波动或该 API 不允许前端直接请求。推荐切换至“硅基流动(SiliconFlow)”测试。`;
-             }
+             if (llmProvider === 'azure') message = `❌ 拦截警报 (Failed to fetch)：\n微软 Azure 的门卫阻止了本次请求 (CORS 拦截)。\n\n【解决方案】：\n请登录 Azure 后台 -> 找到您的模型资源 -> 左侧点击「资源管理」-> 点击「CORS」-> 在"允许的源"中填入 * 或您的 GitHub 网址 -> 保存即可测通！`;
+             else message = `❌ 无法连接服务器 (Failed to fetch)：\n这可能是因为网络波动或该 API 不允许前端直接请求。推荐切换至“硅基流动(SiliconFlow)”测试。`;
           }
           setTestResult({ status: 'error', message });
-        } finally {
-          setIsTesting(false);
-        }
+        } finally { setIsTesting(false); }
       };
 
-      // 其余业务逻辑函数保持不变
+      // 导出为 Word 的方法 (支持丰富排版)
+      const downloadWord = (content, filename) => {
+        // 先剥离可能存在的 JSON 数据块，只导出正文报告
+        const cleanText = content.replace(/```json[\s\S]*?```/g, '');
+        // 借助 marked 将 md 转为 html
+        const htmlBody = marked.parse(cleanText);
+        
+        const html = `
+          <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+              <meta charset="utf-8">
+              <title>Document</title>
+              <style>
+                  body { font-family: 'Microsoft YaHei', 'SimSun', sans-serif; line-height: 1.6; color: #333; }
+                  h1 { color: #1e3a8a; font-size: 24px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+                  h2 { color: #2563eb; font-size: 20px; margin-top: 20px; }
+                  h3 { color: #3b82f6; font-size: 16px; }
+                  table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+                  table, th, td { border: 1px solid #999; }
+                  th { background-color: #f1f5f9; padding: 8px; text-align: left; }
+                  td { padding: 8px; }
+                  blockquote { background: #f8fafc; border-left: 4px solid #cbd5e1; padding: 10px; margin: 10px 0; }
+              </style>
+          </head>
+          <body>
+              ${htmlBody}
+          </body>
+          </html>
+        `;
+        // 利用 Blob 将封装好的 HTML 伪装成 application/msword
+        const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename + '.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("已成功下载 Word 报告！", "success");
+      };
+
+      // 用于美化渲染 Markdown 并剔除 JSON 
+      const renderRichHTML = (text) => {
+        const cleanText = text.replace(/```json[\s\S]*?```/g, '');
+        return { __html: marked.parse(cleanText) };
+      };
+
       const generateInitialDraft = async () => {
         if (!genPosName || !genHardSkills || !genSoftSkills) return showToast("请填写完整的岗位名称、硬技能和软素质！", "warning");
         setIsGeneratingDraft(true);
@@ -313,7 +365,6 @@
         if (!draftPosition) return;
         let newSkillIds = [];
         let updatedSkills = [...skills];
-        
         draftPosition.skills.forEach(dSkill => {
           const existing = updatedSkills.find(s => s.name === dSkill.name);
           if (existing) { newSkillIds.push(existing.id); } else {
@@ -340,28 +391,59 @@
         dynamicRubric += `## 🌊 软性素质\n`;
         posSkills.filter(s => s.type === 'soft').forEach((s, i) => dynamicRubric += `**${i+1}. ${s.name}**\n${s.rubric}\n\n`);
         
-        setIsGenerating(true); setReportResult('');
+        setIsGenerating(true); setReportResult(''); setCurrentParsedScores(null);
         try {
           const resText = await callLLM(BASE_SYSTEM_PROMPT, `${dynamicRubric}\n\n# 候选人\n【姓名】：${candidateName}\n【简历】：${resumeText}\n【录音】：${interviewText}`, 0.2);
           setReportResult(resText || "未返回有效文本");
+          
+          // 提取最终判定结果 S/A/B/C
           const match = resText.match(/\|\s*S\/A\/B\/C\s*\|\s*([SABC])/i) || resText.match(/\|\s*([^|]+)\s*\|\s*([SABC])\s*\|/);
           setCurrentRating(match ? match[match.length - 1].toUpperCase() : 'B');
+          
+          // 智能解析底部的 JSON 结构，提取各维度详细打分
+          let extractedScores = { aiTools: '-', gameDecon: '-', aiAcc: '-', drive: '-', passion: '-', stress: '-' };
+          const jsonMatch = resText.match(/```json\n([\s\S]*?)\n```/);
+          if (jsonMatch) {
+            try {
+               const data = JSON.parse(jsonMatch[1]);
+               extractedScores = {
+                   aiTools: data.knowledge_and_skills?.ai_tools?.score || '-',
+                   gameDecon: data.knowledge_and_skills?.game_deconstruction?.score || '-',
+                   aiAcc: data.soft_skills?.ai_acceptance?.score || '-',
+                   drive: data.soft_skills?.self_drive?.score || '-',
+                   passion: data.soft_skills?.game_passion?.score || '-',
+                   stress: data.soft_skills?.stress_resistance?.score || '-'
+               };
+            } catch(e) { console.warn("解析 JSON 报告数据失败，部分维度将显示缺失。"); }
+          }
+          setCurrentParsedScores(extractedScores);
           showToast("智能打分报告生成完毕！", "success");
         } catch (err) { 
           setReportResult(`打分失败详情: ${err.message}`); 
-          showToast("打分接口被拒绝，请检查配置或网络跨域状态", "error");
+          showToast("打分接口被拒绝，请检查配置", "error");
         } finally { setIsGenerating(false); }
       };
 
       const saveToArchive = () => {
         const pos = positions.find(p => p.id === Number(selectedPosId));
-        setEvaluations([{ id: Date.now(), date: new Date().toLocaleDateString(), candidateName, positionName: pos?.name || '未知', rating: currentRating, reportResult }, ...evaluations]);
+        setEvaluations([{ 
+            id: Date.now(), 
+            date: new Date().toLocaleDateString(), 
+            candidateName, 
+            positionName: pos?.name || '未知', 
+            rating: currentRating, 
+            reportResult,
+            scores: currentParsedScores || {} // 保存具体维度打分
+        }, ...evaluations]);
         showToast(`候选人 ${candidateName} 的记录已成功收录至台账！`, "success");
       };
 
       const exportCSV = () => {
-        let csvContent = "data:text/csv;charset=utf-8,\uFEFF评估日期,候选人姓名,应聘岗位,最终判定\n";
-        evaluations.forEach(e => csvContent += `${e.date},${e.candidateName},${e.positionName},${e.rating}\n`);
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF评估日期,候选人姓名,应聘岗位,最终判定,AI工具实操,游戏系统拆解,AI拥抱度,自驱力,游戏热爱度,抗压能力\n";
+        evaluations.forEach(e => {
+            const scores = e.scores || {};
+            csvContent += `${e.date},${e.candidateName},${e.positionName},${e.rating},${scores.aiTools||'-'},${scores.gameDecon||'-'},${scores.aiAcc||'-'},${scores.drive||'-'},${scores.passion||'-'},${scores.stress||'-'}\n`;
+        });
         const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `贝塔科技面试台账_${new Date().toLocaleDateString()}.csv`);
         document.body.appendChild(link); link.click(); link.remove();
         showToast("成功导出 CSV 表格", "success");
@@ -386,8 +468,8 @@
         else if (type === 'eval') { setEvaluations(evaluations.filter(e => e.id !== id)); showToast("已删除。", "info");}
       };
 
+      // 高级文件上传组件（一键触发、支持原生 label）
       const FileUploadZone = ({ title, iconClass, textState, setTextState, fileNameState, setFileNameState }) => {
-        const fileRef = useRef(null);
         const [isParsing, setIsParsing] = useState(false);
         const [inputMode, setInputMode] = useState('file'); 
 
@@ -434,15 +516,15 @@
           } catch (err) {
             console.error(err); showToast("解析失败: " + err.message, "error"); setIsParsing(false);
           }
-          e.target.value = null;
+          e.target.value = null; // 重置 input
         };
 
         return (
           <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 flex flex-col h-full shadow-sm">
             <div className="flex justify-between items-center mb-4">
-              <label className="text-sm font-bold text-gray-700 flex items-center">
+              <span className="text-sm font-bold text-gray-700 flex items-center">
                 <i className={`${iconClass} mr-2`}></i> {title}
-              </label>
+              </span>
               <div className="flex space-x-2">
                  <button onClick={() => setInputMode('file')} className={`text-xs px-2 py-1 rounded transition-colors ${inputMode==='file'?'bg-gray-200 font-bold text-gray-800':'text-gray-500 hover:bg-gray-100'}`}>文件上传</button>
                  <button onClick={() => setInputMode('text')} className={`text-xs px-2 py-1 rounded transition-colors ${inputMode==='text'?'bg-gray-200 font-bold text-gray-800':'text-gray-500 hover:bg-gray-100'}`}>手动粘贴</button>
@@ -450,14 +532,13 @@
             </div>
             {inputMode === 'file' ? (
               <div className="flex-1 flex flex-col justify-center">
-                <input type="file" accept=".txt,.md,.pdf,.docx" ref={fileRef} className="hidden" onChange={handleUpload} />
                 {isParsing ? (
-                  <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-xl bg-white">
+                  <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-xl bg-white w-full">
                     <i className="fa-solid fa-spinner fa-spin text-blue-500 text-2xl mb-2"></i>
                     <span className="text-sm text-gray-500 font-medium">极速解析中...</span>
                   </div>
                 ) : fileNameState ? (
-                  <div className="flex items-center justify-between p-4 border border-emerald-200 bg-emerald-50 rounded-xl shadow-sm relative group overflow-hidden">
+                  <div className="flex items-center justify-between p-4 border border-emerald-200 bg-emerald-50 rounded-xl shadow-sm relative group overflow-hidden w-full">
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg mr-3 shadow-inner"><i className={`fa-solid ${fileNameState.endsWith('.pdf') ? 'fa-file-pdf' : fileNameState.endsWith('.docx') ? 'fa-file-word' : 'fa-file-lines'}`}></i></div>
@@ -469,11 +550,13 @@
                     <button onClick={() => { setFileNameState(''); setTextState(''); }} className="text-gray-400 hover:text-red-500 transition-colors p-2" title="移除文件"><i className="fa-solid fa-xmark text-lg"></i></button>
                   </div>
                 ) : (
-                  <div onClick={() => fileRef.current.click()} className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/50 hover:bg-blue-50 hover:border-blue-400 cursor-pointer transition-colors group">
+                  // 原生 label 标签彻底解决“需点击两下”的 Bug，无论怎么点击都能瞬间唤起本地文件框
+                  <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/50 hover:bg-blue-50 hover:border-blue-400 cursor-pointer transition-colors group w-full">
+                    <input type="file" accept=".txt,.md,.pdf,.docx" className="hidden" onChange={handleUpload} />
                     <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-blue-500 mb-2 group-hover:scale-110 transition-transform"><i className="fa-solid fa-cloud-arrow-up text-xl"></i></div>
                     <span className="text-sm font-bold text-blue-600">点击上传文档</span>
                     <span className="text-xs text-gray-400 mt-1">支持 PDF、DOCX、TXT</span>
-                  </div>
+                  </label>
                 )}
               </div>
             ) : (
@@ -513,24 +596,21 @@
           {showApiSettings && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-lg animate-fadeIn max-h-[95vh] overflow-y-auto custom-scrollbar">
-                
                 <h2 className="text-xl font-bold mb-4 flex items-center justify-between border-b pb-3">
                   <span><i className="fa-solid fa-microchip mr-2 text-blue-600"></i> API 模型配置</span>
                   <button onClick={() => { setTestResult(null); setShowApiSettings(false); }} className="text-gray-400 hover:text-gray-600"><i className="fa-solid fa-xmark text-xl"></i></button>
                 </h2>
 
-                {/* 隐私安全通告与清除缓存 */}
                 <div className="bg-orange-50 p-3 rounded-lg border border-orange-200 text-xs text-orange-800 mb-5 leading-relaxed relative">
                   <div className="flex items-start">
                     <i className="fa-solid fa-shield-halved mt-0.5 mr-2 text-orange-500"></i>
                     <div>
-                      <strong>安全承诺与防泄漏机制：</strong>本工具为纯前端应用，您在此处填写的 API Key 仅以加密形式<strong>留存在您当前电脑浏览器的缓存中</strong>，绝不上传任何外部服务器。如在公用电脑使用，请务必点击右侧按钮清除数据。
+                      <strong>安全承诺与防泄漏机制：</strong>本工具为纯前端应用，您在此处填写的 API Key 仅以加密形式<strong>留存在您当前电脑浏览器的缓存中</strong>，绝不上传任何外部服务器。
                     </div>
                   </div>
                   <button onClick={clearSecurityData} className="mt-2 w-full bg-orange-100 hover:bg-red-500 hover:text-white text-orange-700 font-bold py-1.5 rounded transition-colors"><i className="fa-solid fa-trash-can mr-1"></i> 立即擦除所有本地配置数据</button>
                 </div>
                 
-                {/* 测通按钮提到最显眼位置 */}
                 <div className="flex items-center justify-between mb-4 bg-slate-50 p-3 rounded-lg border">
                    <div className="text-sm font-bold text-slate-700">步骤 1：测试当前网络是否联通</div>
                    <button onClick={testConnection} disabled={isTesting} className="px-5 py-2 text-sm font-bold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg flex items-center transition-all disabled:opacity-50 shadow-sm">
@@ -538,15 +618,13 @@
                    </button>
                 </div>
 
-                {/* 测试结果诊断台 */}
                 {testResult && (
                   <div className={`mb-5 p-4 rounded-xl border text-xs leading-relaxed font-mono whitespace-pre-wrap shadow-inner ${
                     testResult.status === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 
                     testResult.status === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-blue-50 border-blue-200 text-blue-800 animate-pulse'}`}>
                     {testResult.status === 'testing' && <i className="fa-solid fa-spinner fa-spin mr-1.5 text-blue-500"></i>}
                     {testResult.status === 'success' && <i className="fa-solid fa-circle-check mr-1.5 text-emerald-500 text-lg"></i>}
-                    <strong>网络诊断报告：</strong><br/>
-                    {testResult.message}
+                    <strong>网络诊断报告：</strong><br/>{testResult.message}
                   </div>
                 )}
                 
@@ -562,9 +640,7 @@
                   
                   {llmProvider === 'siliconflow' ? (
                     <div className="space-y-4">
-                      <div className="bg-indigo-50 text-indigo-700 p-3 rounded-lg text-xs font-bold mb-2">
-                        <i className="fa-solid fa-circle-info mr-1"></i> 已为您默认预填了硅基流动的 API 接口和最强 DeepSeek-V3 模型，您只需填入 Key 即可。
-                      </div>
+                      <div className="bg-indigo-50 text-indigo-700 p-3 rounded-lg text-xs font-bold mb-2"><i className="fa-solid fa-circle-info mr-1"></i> 已为您默认预填了硅基流动的 API 接口和最强 DeepSeek-V3 模型。</div>
                       <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Base URL (已预填，无需修改)</label>
                         <input type="text" value={apiBaseUrls.siliconflow} onChange={(e) => setApiBaseUrls({...apiBaseUrls, siliconflow: e.target.value})} className="w-full border-2 bg-gray-50 rounded-lg p-2.5 outline-none text-sm text-gray-500" />
@@ -639,6 +715,32 @@
             </div>
           )}
 
+          {/* 新增：档案库详细报告弹窗 */}
+          {selectedEval && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-8">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-fadeInUp">
+                <div className="flex justify-between items-center p-6 border-b bg-slate-50 rounded-t-2xl">
+                  <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                    <i className="fa-solid fa-file-lines mr-3 text-blue-600 text-2xl"></i>
+                    {selectedEval.candidateName} 的面试评估归档报告
+                  </h2>
+                  <button onClick={() => setSelectedEval(null)} className="text-gray-400 hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50"><i className="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                
+                {/* 使用美化的 Markdown 渲染容器 */}
+                <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-white">
+                  <div className="markdown-container" dangerouslySetInnerHTML={renderRichHTML(selectedEval.reportResult)}></div>
+                </div>
+                
+                <div className="p-5 border-t bg-slate-50 flex justify-end rounded-b-2xl items-center">
+                  <span className="text-xs text-gray-400 mr-auto font-mono"><i className="fa-solid fa-clock mr-1"></i>评估时间：{selectedEval.date}</span>
+                  <button onClick={() => downloadWord(selectedEval.reportResult, `${selectedEval.candidateName}_评估报告`)} className="px-6 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-bold text-sm shadow-md mr-3 transition-transform hover:-translate-y-0.5"><i className="fa-solid fa-file-word mr-2"></i> 导出原生 Word</button>
+                  <button onClick={() => setSelectedEval(null)} className="px-6 py-2.5 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg font-bold text-sm transition-colors">关闭</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
             {/* 工作台 */}
             {activeTab === 'assessment' && (
@@ -681,15 +783,17 @@
                 </div>
                 
                 {reportResult && (
-                   <div className="bg-white p-6 rounded-2xl shadow-2xl border-t-4 border-blue-600 mt-6 animate-fadeInUp">
+                   <div className="bg-white p-8 rounded-2xl shadow-xl border-t-[6px] border-blue-600 mt-6 animate-fadeInUp">
                     <div className="flex justify-between items-center mb-6 border-b pb-4">
-                      <h2 className="text-2xl font-bold flex items-center"><i className="fa-solid fa-file-lines mr-2 text-blue-600"></i> 判定报告</h2>
+                      <h2 className="text-2xl font-bold flex items-center text-slate-800"><i className="fa-solid fa-file-signature mr-3 text-blue-600"></i> AI 智能判定报告</h2>
                       <div className="flex space-x-3">
-                        <button onClick={saveToArchive} className="px-5 py-2.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg font-bold text-sm shadow-sm transition-all"><i className="fa-solid fa-box-archive mr-2"></i> 一键收录台账</button>
-                        <button onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([reportResult], { type: 'text/markdown' })); a.download = `${candidateName}_评估报告.md`; a.click(); }} className="px-5 py-2.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg font-bold text-sm shadow transition-all"><i className="fa-solid fa-file-arrow-up mr-2"></i> 下载为 Markdown</button>
+                        <button onClick={saveToArchive} className="px-5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg font-bold text-sm shadow-sm transition-all"><i className="fa-solid fa-box-archive mr-2"></i> 一键收录台账</button>
+                        {/* 换成了原生 Word 下载按钮 */}
+                        <button onClick={() => downloadWord(reportResult, `${candidateName}_评估报告`)} className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-bold text-sm shadow-md transition-all hover:-translate-y-0.5"><i className="fa-solid fa-file-word mr-2"></i> 下载为 Word 文档</button>
                       </div>
                     </div>
-                    <div className="bg-slate-50 p-6 rounded-xl border border-gray-200 font-mono text-sm whitespace-pre-wrap leading-relaxed shadow-inner overflow-x-auto">{reportResult}</div>
+                    {/* 使用美化后的 UI 组件容器渲染结果 */}
+                    <div className="markdown-container bg-slate-50/50 p-6 rounded-xl border border-gray-100" dangerouslySetInnerHTML={renderRichHTML(reportResult)}></div>
                    </div>
                 )}
               </div>
@@ -783,27 +887,68 @@
               </div>
             )}
 
+            {/* 深度重构了档案库：新增了多维分数展示与弹窗查看功能 */}
             {activeTab === 'archives' && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 animate-fadeIn">
                 <div className="flex justify-between items-center border-b pb-4 mb-4">
-                   <h2 className="text-xl font-bold flex items-center"><i className="fa-solid fa-box-archive mr-2 text-indigo-600"></i> 评估档案台账</h2>
-                   <button onClick={exportCSV} disabled={evaluations.length===0} className="px-5 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-lg font-bold text-sm hover:bg-green-100 disabled:opacity-50 transition-colors flex items-center"><i className="fa-solid fa-download mr-2"></i> 导出 CSV (Excel适用)</button>
+                   <h2 className="text-xl font-bold flex items-center"><i className="fa-solid fa-box-archive mr-2 text-indigo-600"></i> 评估档案多维台账</h2>
+                   <button onClick={exportCSV} disabled={evaluations.length===0} className="px-5 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-lg font-bold text-sm hover:bg-green-100 disabled:opacity-50 transition-colors flex items-center"><i className="fa-solid fa-download mr-2"></i> 导出完整 CSV (支持 Excel)</button>
                 </div>
                 {evaluations.length === 0 ? (
                   <div className="py-16 text-center text-gray-400 font-medium">当前档案库为空，请先前往工作台评估候选人并收录。</div>
                 ) : (
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-gray-600"><tr><th className="p-4 rounded-tl-lg">日期</th><th className="p-4">姓名</th><th className="p-4">应聘岗位</th><th className="p-4">最终评级</th><th className="p-4 rounded-tr-lg">操作</th></tr></thead>
-                    <tbody>
-                      {evaluations.map(ev => (
-                        <tr key={ev.id} className="border-b border-gray-100 hover:bg-blue-50/50">
-                          <td className="p-4 font-mono text-xs">{ev.date}</td><td className="p-4 font-bold text-slate-800">{ev.candidateName}</td><td className="p-4"><span className="bg-blue-50 px-2 py-1 rounded text-blue-700 text-xs font-bold border border-blue-100">{ev.positionName}</span></td>
-                          <td className="p-4"><span className={`font-bold px-2 py-1 rounded ${['S','A'].includes(ev.rating) ? 'bg-green-100 text-green-700' : ev.rating === 'B' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{ev.rating}</span></td>
-                          <td className="p-4"><button onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ev.reportResult], { type: 'text/markdown' })); a.download = `${ev.candidateName}_评估报告.md`; a.click(); }} className="text-blue-500 font-medium text-xs hover:underline mr-4">下载</button><button onClick={() => handleDeleteItem(ev.id, 'eval')} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash-can"></i></button></td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm min-w-[900px]">
+                      <thead className="bg-slate-50 text-gray-600 border-b">
+                        <tr>
+                            <th className="p-4 rounded-tl-lg whitespace-nowrap">评估日期</th>
+                            <th className="p-4 whitespace-nowrap">候选人</th>
+                            <th className="p-4 whitespace-nowrap text-center">最终判定</th>
+                            <th className="p-4 border-l border-r border-gray-200 bg-blue-50/30 text-center" colSpan="2">🧊 核心技能</th>
+                            <th className="p-4 border-r border-gray-200 bg-emerald-50/30 text-center" colSpan="4">🌊 软性素质 (5分制)</th>
+                            <th className="p-4 rounded-tr-lg text-center whitespace-nowrap">操作</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                        <tr className="text-xs text-gray-500 bg-slate-50/50">
+                            <th></th><th></th><th></th>
+                            <th className="p-2 border-l border-gray-200 text-center font-medium">AI工具</th>
+                            <th className="p-2 border-r border-gray-200 text-center font-medium">游戏拆解</th>
+                            <th className="p-2 text-center font-medium">AI拥抱</th>
+                            <th className="p-2 text-center font-medium">自驱力</th>
+                            <th className="p-2 text-center font-medium">游戏热爱</th>
+                            <th className="p-2 border-r border-gray-200 text-center font-medium">抗压力</th>
+                            <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {evaluations.map(ev => {
+                          const s = ev.scores || {};
+                          return (
+                          <tr key={ev.id} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
+                            <td className="p-4 font-mono text-xs text-gray-500 whitespace-nowrap">{ev.date}</td>
+                            <td className="p-4 font-bold text-slate-800 whitespace-nowrap">
+                                {ev.candidateName}
+                                <div className="text-[10px] text-gray-400 font-normal mt-0.5">{ev.positionName}</div>
+                            </td>
+                            <td className="p-4 text-center">
+                                <span className={`font-black px-3 py-1.5 rounded-md text-sm shadow-sm ${['S','A'].includes(ev.rating) ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 text-white' : ev.rating === 'B' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white'}`}>{ev.rating}</span>
+                            </td>
+                            {/* 分数展示列 */}
+                            <td className="p-3 text-center border-l text-xs font-bold text-slate-700">{s.aiTools || '-'}</td>
+                            <td className="p-3 text-center border-r text-xs font-bold text-slate-700">{s.gameDecon || '-'}</td>
+                            <td className="p-3 text-center text-xs font-bold text-slate-700">{s.aiAcc || '-'}</td>
+                            <td className="p-3 text-center text-xs font-bold text-slate-700">{s.drive || '-'}</td>
+                            <td className="p-3 text-center text-xs font-bold text-slate-700">{s.passion || '-'}</td>
+                            <td className="p-3 text-center border-r text-xs font-bold text-slate-700">{s.stress || '-'}</td>
+                            
+                            <td className="p-4 text-center whitespace-nowrap">
+                                <button onClick={() => setSelectedEval(ev)} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded text-xs font-bold mr-2 transition-colors border border-blue-200"><i className="fa-solid fa-eye mr-1"></i>查看详细</button>
+                                <button onClick={() => handleDeleteItem(ev.id, 'eval')} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"><i className="fa-solid fa-trash-can"></i></button>
+                            </td>
+                          </tr>
+                        )})}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}
