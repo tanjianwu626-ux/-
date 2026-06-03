@@ -84,25 +84,30 @@
       useEffect(() => { localStorage.setItem('beta_evaluations', JSON.stringify(evaluations)); }, [evaluations]);
 
       const [showApiSettings, setShowApiSettings] = useState(false);
-      const [llmProvider, setLlmProvider] = useState(localStorage.getItem('llm_provider') || 'azure');
+      // 默认切换为硅基流动作为首选
+      const [llmProvider, setLlmProvider] = useState(localStorage.getItem('llm_provider') || 'siliconflow');
       
       const [apiKeys, setApiKeys] = useState({
         azure: localStorage.getItem('azure_api_key') || '',
         deepseek: localStorage.getItem('deepseek_api_key') || '',
         openai: localStorage.getItem('openai_api_key') || '',
-        gemini: localStorage.getItem('gemini_api_key') || ''
+        gemini: localStorage.getItem('gemini_api_key') || '',
+        siliconflow: localStorage.getItem('siliconflow_api_key') || ''
       });
       
       const [apiBaseUrls, setApiBaseUrls] = useState({
         azure: localStorage.getItem('azure_base_url') || '',
         deepseek: localStorage.getItem('deepseek_base_url') || '',
-        openai: localStorage.getItem('openai_base_url') || ''
+        openai: localStorage.getItem('openai_base_url') || '',
+        siliconflow: localStorage.getItem('siliconflow_base_url') || 'https://api.siliconflow.cn/v1'
       });
 
       const [azureConfig, setAzureConfig] = useState({
         deploymentName: localStorage.getItem('azure_deployment_name') || '',
         apiVersion: localStorage.getItem('azure_api_version') || '2024-02-15-preview'
       });
+
+      const [siliconflowModel, setSiliconflowModel] = useState(localStorage.getItem('siliconflow_model') || 'deepseek-ai/DeepSeek-V3');
 
       const [isTesting, setIsTesting] = useState(false);
       const [testResult, setTestResult] = useState(null); 
@@ -131,19 +136,21 @@
 
       const [manualPosition, setManualPosition] = useState({ name: '', description: '', skillIds: [] });
 
-      // 安全擦除功能
+      // 安全擦除功能 (包含所有新增平台)
       const clearSecurityData = () => {
         if(window.confirm("确定要擦除浏览器本地保存的所有 API 配置信息吗？擦除后需要重新输入。")) {
-           ['azure', 'deepseek', 'openai', 'gemini'].forEach(provider => {
+           ['azure', 'deepseek', 'openai', 'gemini', 'siliconflow'].forEach(provider => {
               localStorage.removeItem(`${provider}_api_key`);
               localStorage.removeItem(`${provider}_base_url`);
            });
            localStorage.removeItem('azure_deployment_name');
            localStorage.removeItem('azure_api_version');
+           localStorage.removeItem('siliconflow_model');
            
-           setApiKeys({ azure: '', deepseek: '', openai: '', gemini: '' });
-           setApiBaseUrls({ azure: '', deepseek: '', openai: '' });
+           setApiKeys({ azure: '', deepseek: '', openai: '', gemini: '', siliconflow: '' });
+           setApiBaseUrls({ azure: '', deepseek: '', openai: '', siliconflow: 'https://api.siliconflow.cn/v1' });
            setAzureConfig({ deploymentName: '', apiVersion: '2024-02-15-preview' });
+           setSiliconflowModel('deepseek-ai/DeepSeek-V3');
            setTestResult(null);
            showToast("本地所有 API 密钥与配置已安全擦除！", "success");
         }
@@ -191,7 +198,6 @@
           };
           if (parseJson) payload.response_format = { type: "json_object" };
 
-          // 核心修复：微软原生 API 只需要 api-key 头，去除多余的 Bearer
           const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 
@@ -206,6 +212,25 @@
             if (res.status === 404) throw new Error("404 找不到部署：请核对 Deployment Name 是否拼写正确。");
             throw new Error(`请求被拒绝 (状态码: ${res.status})`);
           }
+          const data = await res.json();
+          return data.choices?.[0]?.message?.content;
+
+        } else if (llmProvider === 'siliconflow') {
+          // 硅基流动专用通道
+          const baseUrl = (apiBaseUrls.siliconflow.trim() || 'https://api.siliconflow.cn/v1').replace(/\/$/, '') + '/chat/completions';
+          const payload = {
+            model: siliconflowModel.trim() || 'deepseek-ai/DeepSeek-V3',
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+            temperature: temperature
+          };
+          if (parseJson) payload.response_format = { type: "json_object" };
+          
+          const res = await fetch(baseUrl, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`硅基流动 API 错误 ${res.status}：Key无效或余额不足。`);
           const data = await res.json();
           return data.choices?.[0]?.message?.content;
 
@@ -246,7 +271,11 @@
           console.error(err);
           let message = err.message;
           if (message.includes('Failed to fetch') || message.includes('TypeError')) {
-             message = `❌ 拦截警报 (Failed to fetch)：\n微软 Azure 的门卫阻止了本次请求 (CORS 拦截)。\n\n【解决方案】：\n请登录 Azure 后台 -> 找到您的模型资源 -> 左侧点击「资源管理(Resource Management)」-> 点击「CORS」-> 在"允许的源(Allowed origins)"中填入 * 或您的 GitHub 网址 -> 保存即可测通！`;
+             if (llmProvider === 'azure') {
+               message = `❌ 拦截警报 (Failed to fetch)：\n微软 Azure 的门卫阻止了本次请求 (CORS 拦截)。\n\n【解决方案】：\n请登录 Azure 后台 -> 找到您的模型资源 -> 左侧点击「资源管理(Resource Management)」-> 点击「CORS」-> 在"允许的源(Allowed origins)"中填入 * 或您的 GitHub 网址 -> 保存即可测通！`;
+             } else {
+               message = `❌ 无法连接服务器 (Failed to fetch)：\n这可能是因为网络波动或该 API 不允许前端直接请求。推荐切换至“硅基流动(SiliconFlow)”测试。`;
+             }
           }
           setTestResult({ status: 'error', message });
         } finally {
@@ -524,13 +553,34 @@
                 <div className="border-t pt-4">
                   <label className="block text-sm font-bold text-gray-700 mb-2">步骤 2：填入及修改 API 凭证</label>
                   <select value={llmProvider} onChange={(e) => { setLlmProvider(e.target.value); setTestResult(null); }} className="w-full border-2 border-gray-200 rounded-lg p-2.5 mb-4 outline-none focus:border-blue-500 font-bold text-slate-800">
-                    <option value="azure">Microsoft Foundry (Azure OpenAI) - 企业推荐</option>
-                    <option value="deepseek">DeepSeek (高性价比)</option>
+                    <option value="siliconflow">🌟 SiliconFlow (硅基流动) - 无跨域限制推荐</option>
+                    <option value="azure">Microsoft Foundry (Azure OpenAI) - 企业</option>
+                    <option value="deepseek">DeepSeek 官方</option>
                     <option value="openai">OpenAI (官方或第三方代理)</option>
                     <option value="gemini">Google Gemini</option>
                   </select>
                   
-                  {llmProvider === 'azure' ? (
+                  {llmProvider === 'siliconflow' ? (
+                    <div className="space-y-4">
+                      <div className="bg-indigo-50 text-indigo-700 p-3 rounded-lg text-xs font-bold mb-2">
+                        <i className="fa-solid fa-circle-info mr-1"></i> 已为您默认预填了硅基流动的 API 接口和最强 DeepSeek-V3 模型，您只需填入 Key 即可。
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Base URL (已预填，无需修改)</label>
+                        <input type="text" value={apiBaseUrls.siliconflow} onChange={(e) => setApiBaseUrls({...apiBaseUrls, siliconflow: e.target.value})} className="w-full border-2 bg-gray-50 rounded-lg p-2.5 outline-none text-sm text-gray-500" />
+                      </div>
+                      <div className="flex space-x-4">
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-gray-500 mb-1">模型名称 (Model)</label>
+                          <input type="text" value={siliconflowModel} onChange={(e) => setSiliconflowModel(e.target.value)} className="w-full border-2 bg-gray-50 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm font-bold" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-gray-500 mb-1">API Key <span className="text-red-500">*</span></label>
+                          <input type="password" value={apiKeys.siliconflow} onChange={(e) => setApiKeys({...apiKeys, siliconflow: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="sk-..." />
+                        </div>
+                      </div>
+                    </div>
+                  ) : llmProvider === 'azure' ? (
                     <div className="space-y-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Azure Endpoint (Base URL) <span className="text-red-500">*</span></label>
@@ -576,6 +626,9 @@
                     if(llmProvider === 'azure'){
                       localStorage.setItem('azure_deployment_name', azureConfig.deploymentName);
                       localStorage.setItem('azure_api_version', azureConfig.apiVersion);
+                    }
+                    if (llmProvider === 'siliconflow') {
+                      localStorage.setItem('siliconflow_model', siliconflowModel);
                     }
                     setTestResult(null);
                     setShowApiSettings(false); 
