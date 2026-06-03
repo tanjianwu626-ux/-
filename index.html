@@ -24,7 +24,7 @@
   <!-- 引入 PDF.js 用于纯前端解析 PDF 文档 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
-    // 配置 PDF.js 的 Worker 路径 (解析必须)
+    // 配置 PDF.js 的 Worker 路径
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
   </script>
 
@@ -72,7 +72,7 @@
       const [positions, setPositions] = useState(() => loadState('beta_positions', DEFAULT_POSITIONS));
       const [evaluations, setEvaluations] = useState(() => loadState('beta_evaluations', []));
 
-      // 自定义 Toast 提示
+      // Toast 提示
       const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
       const showToast = (message, type = 'info') => {
         setToast({ show: true, message, type });
@@ -99,16 +99,15 @@
         openai: localStorage.getItem('openai_base_url') || ''
       });
 
-      // Azure 专属配置
       const [azureConfig, setAzureConfig] = useState({
         deploymentName: localStorage.getItem('azure_deployment_name') || '',
         apiVersion: localStorage.getItem('azure_api_version') || '2024-02-15-preview'
       });
 
-      // API 一键测通连接状态
       const [isTesting, setIsTesting] = useState(false);
-      const [testResult, setTestResult] = useState(null); // { status: 'success'|'error'|'testing', message: '' }
+      const [testResult, setTestResult] = useState(null); 
 
+      // 业务状态
       const [newSkill, setNewSkill] = useState({ type: 'hard', name: '', rubric: '' });
       const [genPosName, setGenPosName] = useState('');
       const [genHardSkills, setGenHardSkills] = useState('');
@@ -123,7 +122,6 @@
       
       const [resumeText, setResumeText] = useState('');
       const [interviewText, setInterviewText] = useState('');
-      
       const [resumeFileName, setResumeFileName] = useState('');
       const [interviewFileName, setInterviewFileName] = useState('');
 
@@ -133,29 +131,40 @@
 
       const [manualPosition, setManualPosition] = useState({ name: '', description: '', skillIds: [] });
 
-      // 智能宽容度 URL 解析与构建
+      // 安全擦除功能
+      const clearSecurityData = () => {
+        if(window.confirm("确定要擦除浏览器本地保存的所有 API 配置信息吗？擦除后需要重新输入。")) {
+           ['azure', 'deepseek', 'openai', 'gemini'].forEach(provider => {
+              localStorage.removeItem(`${provider}_api_key`);
+              localStorage.removeItem(`${provider}_base_url`);
+           });
+           localStorage.removeItem('azure_deployment_name');
+           localStorage.removeItem('azure_api_version');
+           
+           setApiKeys({ azure: '', deepseek: '', openai: '', gemini: '' });
+           setApiBaseUrls({ azure: '', deepseek: '', openai: '' });
+           setAzureConfig({ deploymentName: '', apiVersion: '2024-02-15-preview' });
+           setTestResult(null);
+           showToast("本地所有 API 密钥与配置已安全擦除！", "success");
+        }
+      };
+
       const buildAzureEndpoint = (baseUrl, deployment, version) => {
         let cleanBase = baseUrl.trim();
-        // 1. 如果用户粘贴了极其完整的最终终结点 URL，直接智能提取基础域并标准化拼装
         if (cleanBase.includes('/openai/deployments/')) {
           const match = cleanBase.match(/(https:\/\/[^\/]+)/);
           if (match) cleanBase = match[1];
         }
-        // 确保以 https:// 开头
         if (!cleanBase.startsWith('http://') && !cleanBase.startsWith('https://')) {
           cleanBase = 'https://' + cleanBase;
         }
-        // 去除尾部斜杠
         cleanBase = cleanBase.replace(/\/$/, '');
         return `${cleanBase}/openai/deployments/${deployment}/chat/completions?api-version=${version}`;
       };
 
-      // LLM 请求封装
       const callLLM = async (systemPrompt, userPrompt, temperature = 0.2, parseJson = false) => {
         const currentKey = apiKeys[llmProvider]?.trim();
-        if (!currentKey) {
-          throw new Error(`请先在模型配置(右上角⚙️)中填写并保存您的 API Key`);
-        }
+        if (!currentKey) throw new Error(`请先配置并保存您的 API Key`);
 
         if (llmProvider === 'gemini') {
           const payload = { contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }] };
@@ -163,12 +172,11 @@
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${currentKey}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
           });
-          if (!res.ok) throw new Error(`Gemini API 错误: 状态码 ${res.status}`);
+          if (!res.ok) throw new Error(`Gemini API 错误: ${res.status}`);
           const data = await res.json();
           return data.candidates?.[0]?.content?.parts?.[0]?.text;
           
         } else if (llmProvider === 'azure') {
-          // Microsoft Foundry (Azure OpenAI) 智能宽容解析调用逻辑
           const baseUrl = apiBaseUrls.azure.trim();
           const deployment = azureConfig.deploymentName.trim();
           const version = azureConfig.apiVersion.trim();
@@ -183,39 +191,29 @@
           };
           if (parseJson) payload.response_format = { type: "json_object" };
 
-          // 同时采用 api-key 和 Bearer 两种头部鉴权，完美兼容
+          // 核心修复：微软原生 API 只需要 api-key 头，去除多余的 Bearer
           const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json', 
-              'api-key': currentKey,
-              'Authorization': `Bearer ${currentKey}`
+              'api-key': currentKey
             },
             body: JSON.stringify(payload)
           });
 
           if (!res.ok) {
-            if (res.status === 401) throw new Error("微软授权失败(401)：您的 API Key 填写有误。");
-            if (res.status === 404) throw new Error("未找到部署终结点(404)：请核对 Deployment Name、API Version 或 Base URL 的格式。");
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(`微软 API 报错 [${res.status}]: ${errData?.error?.message || '未知异常'}`);
+            if (res.status === 401) throw new Error("401 未授权：请检查 API Key 是否正确填写，不能有多余空格。");
+            if (res.status === 404) throw new Error("404 找不到部署：请核对 Deployment Name 是否拼写正确。");
+            throw new Error(`请求被拒绝 (状态码: ${res.status})`);
           }
           const data = await res.json();
           return data.choices?.[0]?.message?.content;
 
         } else {
-          // OpenAI & DeepSeek 逻辑
-          let endpoint = '';
-          const modelName = llmProvider === 'openai' ? 'gpt-4o' : 'deepseek-chat';
-          
-          if (llmProvider === 'openai') {
-            endpoint = (apiBaseUrls.openai.trim() || 'https://api.openai.com').replace(/\/$/, '') + '/v1/chat/completions';
-          } else {
-            endpoint = (apiBaseUrls.deepseek.trim() || 'https://api.deepseek.com').replace(/\/$/, '') + '/chat/completions';
-          }
-
+          // OpenAI / DeepSeek
+          let endpoint = (llmProvider === 'openai' ? (apiBaseUrls.openai.trim() || 'https://api.openai.com') : (apiBaseUrls.deepseek.trim() || 'https://api.deepseek.com')).replace(/\/$/, '') + (llmProvider === 'openai' ? '/v1/chat/completions' : '/chat/completions');
           const payload = {
-            model: modelName,
+            model: llmProvider === 'openai' ? 'gpt-4o' : 'deepseek-chat',
             messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
             temperature: temperature
           };
@@ -226,34 +224,29 @@
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
             body: JSON.stringify(payload)
           });
-          if (!res.ok) {
-            if (res.status === 401) throw new Error(`401 未授权：API Key 错误。`);
-            throw new Error(`API 错误 状态码: ${res.status}`);
-          }
+          if (!res.ok) throw new Error(`API 错误 ${res.status}：Key无效或未授权。`);
           const data = await res.json();
           return data.choices?.[0]?.message?.content;
         }
       };
 
-      // 自定义 API 一键连接测试器
       const testConnection = async () => {
         setIsTesting(true);
-        setTestResult({ status: 'testing', message: '正在呼叫 API 进行连接测试...' });
+        setTestResult({ status: 'testing', message: '🚀 正在呼叫服务器进行握手测试...' });
         try {
-          const systemPrompt = "You are a network connectivity test agent. Reply with exactly the word 'OK' and nothing else.";
+          const systemPrompt = "Reply 'OK'";
           const userPrompt = "Ping";
           const resText = await callLLM(systemPrompt, userPrompt, 0.1);
           if (resText) {
-            setTestResult({ status: 'success', message: '🎉 通道测通成功！API 已经与系统正常对接，反馈正常。' });
+            setTestResult({ status: 'success', message: '🎉 通道测通成功！API 正常工作，随时可以开始评估打分。' });
           } else {
-            setTestResult({ status: 'warning', message: '收到响应但内容为空，可能返回受限。' });
+            setTestResult({ status: 'warning', message: '收到响应但内容为空，可能存在异常。' });
           }
         } catch (err) {
           console.error(err);
           let message = err.message;
-          // 解析经典 Failed to Fetch 报错，告知跨域和网络限制
           if (message.includes('Failed to fetch') || message.includes('TypeError')) {
-            message = `❌ Failed to fetch (无法建立连接)：\n1. 极大概率是遇到了 CORS (跨域请求拦截)。微软 Azure 的服务默认限制从网页端直接呼叫。您可以在浏览器安装“Allow CORS”插件进行绕过，或联系工程师将本项目代码作为静态托管部署在微软认可的同源域中。\n2. 请检查网络代理/科学上网是否正常工作。\n3. 请核对您的 Endpoint (Base URL)拼写是否正确。`;
+             message = `❌ 拦截警报 (Failed to fetch)：\n微软 Azure 的门卫阻止了本次请求 (CORS 拦截)。\n\n【解决方案】：\n请登录 Azure 后台 -> 找到您的模型资源 -> 左侧点击「资源管理(Resource Management)」-> 点击「CORS」-> 在"允许的源(Allowed origins)"中填入 * 或您的 GitHub 网址 -> 保存即可测通！`;
           }
           setTestResult({ status: 'error', message });
         } finally {
@@ -261,6 +254,7 @@
         }
       };
 
+      // 其余业务逻辑函数保持不变
       const generateInitialDraft = async () => {
         if (!genPosName || !genHardSkills || !genSoftSkills) return showToast("请填写完整的岗位名称、硬技能和软素质！", "warning");
         setIsGeneratingDraft(true);
@@ -293,9 +287,7 @@
         
         draftPosition.skills.forEach(dSkill => {
           const existing = updatedSkills.find(s => s.name === dSkill.name);
-          if (existing) {
-            newSkillIds.push(existing.id);
-          } else {
+          if (existing) { newSkillIds.push(existing.id); } else {
             const newId = Date.now() + Math.floor(Math.random() * 10000);
             updatedSkills.push({ id: newId, type: dSkill.type, name: dSkill.name, rubric: dSkill.rubric });
             newSkillIds.push(newId);
@@ -310,7 +302,6 @@
       const generateReport = async () => {
         if (!candidateName) return showToast("请先填候选人姓名！", "warning");
         if (!resumeText && !interviewText) return showToast("请上传候选人简历与面试录音文件！", "warning");
-        
         const position = positions.find(p => p.id === Number(selectedPosId));
         if (!position) return;
         
@@ -328,8 +319,8 @@
           setCurrentRating(match ? match[match.length - 1].toUpperCase() : 'B');
           showToast("智能打分报告生成完毕！", "success");
         } catch (err) { 
-          setReportResult(`API 调用失败: ${err.message}`); 
-          showToast("打分失败: " + err.message, "error");
+          setReportResult(`打分失败详情: ${err.message}`); 
+          showToast("打分接口被拒绝，请检查配置或网络跨域状态", "error");
         } finally { setIsGenerating(false); }
       };
 
@@ -342,9 +333,9 @@
       const exportCSV = () => {
         let csvContent = "data:text/csv;charset=utf-8,\uFEFF评估日期,候选人姓名,应聘岗位,最终判定\n";
         evaluations.forEach(e => csvContent += `${e.date},${e.candidateName},${e.positionName},${e.rating}\n`);
-        const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `贝塔科技智能面试评估台账_${new Date().toLocaleDateString()}.csv`);
+        const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `贝塔科技面试台账_${new Date().toLocaleDateString()}.csv`);
         document.body.appendChild(link); link.click(); link.remove();
-        showToast("成功导出 CSV 台账表格", "success");
+        showToast("成功导出 CSV 表格", "success");
       };
 
       const togglePosSkill = (skillId) => setManualPosition(prev => ({...prev, skillIds: prev.skillIds.includes(skillId) ? prev.skillIds.filter(id => id !== skillId) : [...prev.skillIds, skillId]}));
@@ -352,7 +343,7 @@
         if (!manualPosition.name || manualPosition.skillIds.length === 0) return showToast("名称和所需能力不能为空！", "warning");
         setPositions([...positions, { ...manualPosition, id: Date.now() }]);
         setManualPosition({ name: '', description: '', skillIds: [] });
-        showToast("手动画像组合并入库成功！", "success");
+        showToast("手动画像组合入库成功！", "success");
       };
       const handleAddSkill = () => {
         if (!newSkill.name || !newSkill.rubric) return showToast("请填写完整的名称和界定标准！", "warning");
@@ -366,11 +357,10 @@
         else if (type === 'eval') { setEvaluations(evaluations.filter(e => e.id !== id)); showToast("已删除。", "info");}
       };
 
-      // 封装的上传组件，支持解析并显示文件卡片而非文本框
       const FileUploadZone = ({ title, iconClass, textState, setTextState, fileNameState, setFileNameState }) => {
         const fileRef = useRef(null);
         const [isParsing, setIsParsing] = useState(false);
-        const [inputMode, setInputMode] = useState('file'); // 'file' or 'text'
+        const [inputMode, setInputMode] = useState('file'); 
 
         const handleUpload = async (e) => {
           const file = e.target.files[0];
@@ -409,15 +399,11 @@
               setFileNameState(file.name);
               setIsParsing(false);
               showToast(`成功解析 PDF: ${file.name}`, 'success');
-            } 
-            else {
-              showToast("不支持的文件格式", "warning");
-              setIsParsing(false);
+            } else {
+              showToast("不支持的文件格式", "warning"); setIsParsing(false);
             }
           } catch (err) {
-            console.error(err);
-            showToast("文件解析失败: " + err.message, "error");
-            setIsParsing(false);
+            console.error(err); showToast("解析失败: " + err.message, "error"); setIsParsing(false);
           }
           e.target.value = null;
         };
@@ -433,41 +419,36 @@
                  <button onClick={() => setInputMode('text')} className={`text-xs px-2 py-1 rounded transition-colors ${inputMode==='text'?'bg-gray-200 font-bold text-gray-800':'text-gray-500 hover:bg-gray-100'}`}>手动粘贴</button>
               </div>
             </div>
-
             {inputMode === 'file' ? (
               <div className="flex-1 flex flex-col justify-center">
                 <input type="file" accept=".txt,.md,.pdf,.docx" ref={fileRef} className="hidden" onChange={handleUpload} />
                 {isParsing ? (
                   <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-xl bg-white">
                     <i className="fa-solid fa-spinner fa-spin text-blue-500 text-2xl mb-2"></i>
-                    <span className="text-sm text-gray-500 font-medium">后台极速解析中...</span>
+                    <span className="text-sm text-gray-500 font-medium">极速解析中...</span>
                   </div>
                 ) : fileNameState ? (
                   <div className="flex items-center justify-between p-4 border border-emerald-200 bg-emerald-50 rounded-xl shadow-sm relative group overflow-hidden">
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
                     <div className="flex items-center">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg mr-3 shadow-inner">
-                        <i className={`fa-solid ${fileNameState.endsWith('.pdf') ? 'fa-file-pdf' : fileNameState.endsWith('.docx') ? 'fa-file-word' : 'fa-file-lines'}`}></i>
-                      </div>
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg mr-3 shadow-inner"><i className={`fa-solid ${fileNameState.endsWith('.pdf') ? 'fa-file-pdf' : fileNameState.endsWith('.docx') ? 'fa-file-word' : 'fa-file-lines'}`}></i></div>
                       <div className="overflow-hidden">
                         <p className="text-sm font-bold text-gray-800 truncate w-48" title={fileNameState}>{fileNameState}</p>
-                        <p className="text-xs text-emerald-600 mt-0.5"><i className="fa-solid fa-check-circle mr-1"></i>已成功解析并提取文本</p>
+                        <p className="text-xs text-emerald-600 mt-0.5"><i className="fa-solid fa-check-circle mr-1"></i>已成功提取文本</p>
                       </div>
                     </div>
                     <button onClick={() => { setFileNameState(''); setTextState(''); }} className="text-gray-400 hover:text-red-500 transition-colors p-2" title="移除文件"><i className="fa-solid fa-xmark text-lg"></i></button>
                   </div>
                 ) : (
                   <div onClick={() => fileRef.current.click()} className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/50 hover:bg-blue-50 hover:border-blue-400 cursor-pointer transition-colors group">
-                    <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-blue-500 mb-2 group-hover:scale-110 transition-transform">
-                      <i className="fa-solid fa-cloud-arrow-up text-xl"></i>
-                    </div>
+                    <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-blue-500 mb-2 group-hover:scale-110 transition-transform"><i className="fa-solid fa-cloud-arrow-up text-xl"></i></div>
                     <span className="text-sm font-bold text-blue-600">点击上传文档</span>
-                    <span className="text-xs text-gray-400 mt-1">支持 PDF、DOCX、TXT，全自动无感解析</span>
+                    <span className="text-xs text-gray-400 mt-1">支持 PDF、DOCX、TXT</span>
                   </div>
                 )}
               </div>
             ) : (
-              <textarea value={textState} onChange={e => { setTextState(e.target.value); setFileNameState(''); }} placeholder="若无法上传文件，可在此直接粘贴文本..." className="w-full flex-1 min-h-[140px] p-3 rounded-lg border border-gray-200 outline-none focus:border-blue-400 text-sm leading-relaxed custom-scrollbar bg-white resize-y" />
+              <textarea value={textState} onChange={e => { setTextState(e.target.value); setFileNameState(''); }} placeholder="在此处粘贴纯文本..." className="w-full flex-1 min-h-[140px] p-3 rounded-lg border border-gray-200 outline-none focus:border-blue-400 text-sm leading-relaxed custom-scrollbar bg-white resize-y" />
             )}
           </div>
         );
@@ -502,92 +483,104 @@
 
           {showApiSettings && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-lg animate-fadeIn max-h-[90vh] overflow-y-auto custom-scrollbar">
-                <h2 className="text-xl font-bold mb-5 flex items-center justify-between">
+              <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-lg animate-fadeIn max-h-[95vh] overflow-y-auto custom-scrollbar">
+                
+                <h2 className="text-xl font-bold mb-4 flex items-center justify-between border-b pb-3">
                   <span><i className="fa-solid fa-microchip mr-2 text-blue-600"></i> API 模型配置</span>
-                  <button onClick={() => { setTestResult(null); setShowApiSettings(false); }} className="text-gray-400 hover:text-gray-600"><i className="fa-solid fa-xmark"></i></button>
+                  <button onClick={() => { setTestResult(null); setShowApiSettings(false); }} className="text-gray-400 hover:text-gray-600"><i className="fa-solid fa-xmark text-xl"></i></button>
                 </h2>
-                
-                <label className="block text-xs font-bold text-gray-500 mb-1">选择驱动提供商</label>
-                <select value={llmProvider} onChange={(e) => { setLlmProvider(e.target.value); setTestResult(null); }} className="w-full border-2 border-gray-200 rounded-lg p-2.5 mb-4 outline-none focus:border-blue-500 font-bold text-slate-800">
-                  <option value="azure">Microsoft Foundry (Azure OpenAI) - 推荐</option>
-                  <option value="deepseek">DeepSeek (高性价比)</option>
-                  <option value="openai">OpenAI (官方或第三方代理)</option>
-                  <option value="gemini">Google Gemini</option>
-                </select>
-                
-                {llmProvider === 'azure' ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">Azure Endpoint (Base URL) <span className="text-red-500">*</span></label>
-                      <input type="text" value={apiBaseUrls.azure} onChange={(e) => setApiBaseUrls({...apiBaseUrls, azure: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="支持完整粘贴：https://<资源名>.openai.azure.com" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">Deployment Name (部署模型名) <span className="text-red-500">*</span></label>
-                      <input type="text" value={azureConfig.deploymentName} onChange={(e) => setAzureConfig({...azureConfig, deploymentName: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="即您在 Azure 控制台部署模型时自定义的名字" />
-                    </div>
-                    <div className="flex space-x-4">
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-gray-500 mb-1">API Version</label>
-                        <input type="text" value={azureConfig.apiVersion} onChange={(e) => setAzureConfig({...azureConfig, apiVersion: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="例：2024-02-15-preview" />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold text-gray-500 mb-1">API Key <span className="text-red-500">*</span></label>
-                        <input type="password" value={apiKeys.azure} onChange={(e) => setApiKeys({...apiKeys, azure: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="Azure API 密钥" />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-1">API Key (必填)</label>
-                      <input type="password" value={apiKeys[llmProvider]} onChange={(e) => setApiKeys({...apiKeys, [llmProvider]: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500" placeholder={`${llmProvider.toUpperCase()} API Key`} />
-                    </div>
-                    {(llmProvider === 'openai' || llmProvider === 'deepseek') && (
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">自定义 Base URL (若用代理则必填)</label>
-                        <input type="text" value={apiBaseUrls[llmProvider]} onChange={(e) => setApiBaseUrls({...apiBaseUrls, [llmProvider]: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="例如：https://api.yourproxy.com" />
-                      </div>
-                    )}
-                  </div>
-                )}
 
-                {/* 连接测试反馈展示区 */}
+                {/* 隐私安全通告与清除缓存 */}
+                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200 text-xs text-orange-800 mb-5 leading-relaxed relative">
+                  <div className="flex items-start">
+                    <i className="fa-solid fa-shield-halved mt-0.5 mr-2 text-orange-500"></i>
+                    <div>
+                      <strong>安全承诺与防泄漏机制：</strong>本工具为纯前端应用，您在此处填写的 API Key 仅以加密形式<strong>留存在您当前电脑浏览器的缓存中</strong>，绝不上传任何外部服务器。如在公用电脑使用，请务必点击右侧按钮清除数据。
+                    </div>
+                  </div>
+                  <button onClick={clearSecurityData} className="mt-2 w-full bg-orange-100 hover:bg-red-500 hover:text-white text-orange-700 font-bold py-1.5 rounded transition-colors"><i className="fa-solid fa-trash-can mr-1"></i> 立即擦除所有本地配置数据</button>
+                </div>
+                
+                {/* 测通按钮提到最显眼位置 */}
+                <div className="flex items-center justify-between mb-4 bg-slate-50 p-3 rounded-lg border">
+                   <div className="text-sm font-bold text-slate-700">步骤 1：测试当前网络是否联通</div>
+                   <button onClick={testConnection} disabled={isTesting} className="px-5 py-2 text-sm font-bold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg flex items-center transition-all disabled:opacity-50 shadow-sm">
+                      {isTesting ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-satellite-dish mr-2"></i>} 一键发送诊断请求
+                   </button>
+                </div>
+
+                {/* 测试结果诊断台 */}
                 {testResult && (
-                  <div className={`mt-5 p-4 rounded-xl border text-xs leading-relaxed font-mono whitespace-pre-wrap shadow-inner ${
+                  <div className={`mb-5 p-4 rounded-xl border text-xs leading-relaxed font-mono whitespace-pre-wrap shadow-inner ${
                     testResult.status === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 
                     testResult.status === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-blue-50 border-blue-200 text-blue-800 animate-pulse'}`}>
                     {testResult.status === 'testing' && <i className="fa-solid fa-spinner fa-spin mr-1.5 text-blue-500"></i>}
-                    {testResult.status === 'success' && <i className="fa-solid fa-circle-check mr-1.5 text-emerald-500"></i>}
+                    {testResult.status === 'success' && <i className="fa-solid fa-circle-check mr-1.5 text-emerald-500 text-lg"></i>}
+                    <strong>网络诊断报告：</strong><br/>
                     {testResult.message}
                   </div>
                 )}
                 
-                <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
-                  {/* 一键测通按钮 */}
-                  <button 
-                    onClick={testConnection} 
-                    disabled={isTesting}
-                    className="px-4 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg flex items-center transition-all disabled:opacity-50">
-                    {isTesting ? <i className="fa-solid fa-spinner fa-spin mr-1.5"></i> : <i className="fa-solid fa-vial mr-1.5"></i>}
-                    测试网络连接
-                  </button>
-
-                  <div className="flex space-x-3">
-                    <button onClick={() => { setTestResult(null); setShowApiSettings(false); }} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
-                    <button onClick={() => { 
-                      localStorage.setItem('llm_provider', llmProvider); 
-                      localStorage.setItem(`${llmProvider}_api_key`, apiKeys[llmProvider]); 
-                      localStorage.setItem(`${llmProvider}_base_url`, apiBaseUrls[llmProvider]);
-                      if(llmProvider === 'azure'){
-                        localStorage.setItem('azure_deployment_name', azureConfig.deploymentName);
-                        localStorage.setItem('azure_api_version', azureConfig.apiVersion);
-                      }
-                      setTestResult(null);
-                      setShowApiSettings(false); 
-                      showToast("API 配置保存成功！", "success");
-                    }} className="px-5 py-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 font-bold"><i className="fa-solid fa-floppy-disk mr-2"></i> 保存配置</button>
-                  </div>
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">步骤 2：填入及修改 API 凭证</label>
+                  <select value={llmProvider} onChange={(e) => { setLlmProvider(e.target.value); setTestResult(null); }} className="w-full border-2 border-gray-200 rounded-lg p-2.5 mb-4 outline-none focus:border-blue-500 font-bold text-slate-800">
+                    <option value="azure">Microsoft Foundry (Azure OpenAI) - 企业推荐</option>
+                    <option value="deepseek">DeepSeek (高性价比)</option>
+                    <option value="openai">OpenAI (官方或第三方代理)</option>
+                    <option value="gemini">Google Gemini</option>
+                  </select>
+                  
+                  {llmProvider === 'azure' ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Azure Endpoint (Base URL) <span className="text-red-500">*</span></label>
+                        <input type="text" value={apiBaseUrls.azure} onChange={(e) => setApiBaseUrls({...apiBaseUrls, azure: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="如：https://your-resource.openai.azure.com" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Deployment Name (部署模型名) <span className="text-red-500">*</span></label>
+                        <input type="text" value={azureConfig.deploymentName} onChange={(e) => setAzureConfig({...azureConfig, deploymentName: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="如：gpt-4o" />
+                      </div>
+                      <div className="flex space-x-4">
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-gray-500 mb-1">API Version</label>
+                          <input type="text" value={azureConfig.apiVersion} onChange={(e) => setAzureConfig({...azureConfig, apiVersion: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="2024-02-15-preview" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-gray-500 mb-1">API Key <span className="text-red-500">*</span></label>
+                          <input type="password" value={apiKeys.azure} onChange={(e) => setApiKeys({...apiKeys, azure: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="********" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">API Key (必填)</label>
+                        <input type="password" value={apiKeys[llmProvider]} onChange={(e) => setApiKeys({...apiKeys, [llmProvider]: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500" placeholder={`********`} />
+                      </div>
+                      {(llmProvider === 'openai' || llmProvider === 'deepseek') && (
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 mb-1">自定义 Base URL (若用代理则必填)</label>
+                          <input type="text" value={apiBaseUrls[llmProvider]} onChange={(e) => setApiBaseUrls({...apiBaseUrls, [llmProvider]: e.target.value})} className="w-full border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" placeholder="例如：https://api.yourproxy.com" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-100">
+                  <button onClick={() => { setTestResult(null); setShowApiSettings(false); }} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-bold">关闭窗口</button>
+                  <button onClick={() => { 
+                    localStorage.setItem('llm_provider', llmProvider); 
+                    localStorage.setItem(`${llmProvider}_api_key`, apiKeys[llmProvider]); 
+                    localStorage.setItem(`${llmProvider}_base_url`, apiBaseUrls[llmProvider]);
+                    if(llmProvider === 'azure'){
+                      localStorage.setItem('azure_deployment_name', azureConfig.deploymentName);
+                      localStorage.setItem('azure_api_version', azureConfig.apiVersion);
+                    }
+                    setTestResult(null);
+                    setShowApiSettings(false); 
+                    showToast("API 配置保存成功！", "success");
+                  }} className="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 font-bold shadow-md"><i className="fa-solid fa-floppy-disk mr-2"></i> 保存您的凭据</button>
                 </div>
               </div>
             </div>
@@ -649,7 +642,7 @@
               </div>
             )}
 
-            {/* 其它模块代码保持不变 */}
+            {/* 其它模块保持不变 */}
             {activeTab === 'positions' && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="bg-slate-900 p-6 rounded-2xl shadow-lg text-white">
