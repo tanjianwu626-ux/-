@@ -41,28 +41,30 @@
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
     
     /* 极致美化的报告渲染样式 */
-    .markdown-container { color: #334155; font-size: 0.95rem; line-height: 1.7; }
+    .markdown-container { color: #1e293b; font-size: 0.95rem; line-height: 1.8; }
     .markdown-container h1 { font-size: 1.5rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 1rem; color: #1e3a8a; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
     .markdown-container h1:first-child { margin-top: 0; }
-    .markdown-container h2 { font-size: 1.25rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #2563eb; }
-    .markdown-container h3 { font-size: 1.125rem; font-weight: 700; margin-top: 1.25rem; margin-bottom: 0.5rem; color: #3b82f6; }
-    .markdown-container h4 { font-size: 1rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #475569; }
+    .markdown-container h2 { font-size: 1.25rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #2563eb; display: flex; align-items: center; }
+    .markdown-container h3 { font-size: 1.125rem; font-weight: 700; margin-top: 1.25rem; margin-bottom: 0.5rem; color: #0284c7; }
+    .markdown-container h4 { font-size: 1rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #334155; }
     .markdown-container p { margin-bottom: 1rem; }
-    .markdown-container ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #475569; }
-    .markdown-container ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; color: #475569; }
+    .markdown-container ul { list-style-type: none; padding-left: 0.5rem; margin-bottom: 1rem; color: #334155; }
+    .markdown-container ul li { position: relative; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+    .markdown-container ul li::before { content: "•"; color: #3b82f6; font-weight: bold; position: absolute; left: 0.5rem; }
+    .markdown-container ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; color: #334155; }
     .markdown-container li { margin-bottom: 0.35rem; }
-    .markdown-container strong { color: #0f172a; font-weight: bold; background-color: #fef08a; padding: 0 4px; border-radius: 4px; }
-    .markdown-container table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .markdown-container th, .markdown-container td { border: 1px solid #e2e8f0; padding: 0.75rem 1rem; text-align: left; }
-    .markdown-container th { background-color: #f8fafc; font-weight: bold; color: #1e293b; }
+    .markdown-container strong { color: #0f172a; font-weight: 800; background-color: #fef08a; padding: 2px 6px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .markdown-container table { width: 100%; border-collapse: collapse; margin-top: 1rem; margin-bottom: 1.5rem; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: hidden; }
+    .markdown-container th, .markdown-container td { border: 1px solid #e2e8f0; padding: 0.85rem 1rem; text-align: left; }
+    .markdown-container th { background-color: #f1f5f9; font-weight: 800; color: #0f172a; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; }
     .markdown-container tr:nth-child(even) { background-color: #f8fafc; }
-    .markdown-container blockquote { border-left: 4px solid #3b82f6; background-color: #eff6ff; padding: 1rem; margin-bottom: 1rem; border-radius: 0 0.5rem 0.5rem 0; color: #1e40af; font-style: italic; }
+    .markdown-container tr:hover { background-color: #f1f5f9; }
+    .markdown-container blockquote { border-left: 4px solid #3b82f6; background-color: #eff6ff; padding: 1rem 1.2rem; margin-bottom: 1.5rem; border-radius: 0 0.5rem 0.5rem 0; color: #1e40af; font-style: normal; }
   </style>
 </head>
 <body class="bg-slate-50">
   <div id="root"></div>
 
-  <!-- React 业务代码 -->
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
@@ -80,7 +82,8 @@
       { id: 1, name: 'AI策划实习生 (默认严苛版)', description: '针对26届培养岗，重自驱与AI深度', skillIds: [1, 2, 3, 4, 5, 6, 7] }
     ];
 
-    const BASE_SYSTEM_PROMPT = `# Role\n你是一位就职于“北京贝塔科技”的资深游戏制作人兼主策划。任务是根据提供的【候选人简历】与【面试录音】，运用设定的【岗位素质模型】，客观、犀利、极度严格地评估候选人。\n\n# Task (核心纪律要求)\n1. 角色隔离防污染：绝不能将面试官的观点误认作候选人的产出。只评估独立表达内容！基于STAR法则深挖真实动机和卡点。\n2. 绝对客观防脑补：如果某项能力未提及或只有空洞套话，直接标记为“未识别”。必须有具体工具名、数据、卡点佐证。\n3. 严禁分数通胀：不轻易给5分！5分代表Top 5%的顶尖水平。必须有极具说服力的客观事实才能给4-5分。\n\n# 🧮 录用判定核心算法\n* 淘汰 (C)：显性技能中出现【较差】，或软素质中出现【1分/2分】。\n* 待定 (B)：统计所有“未识别”数量。如果【未识别】 > 1 个，触发熔断判定为待定。\n* 录用 (A/S)：未触碰红线且【未识别】 ≤ 1 个。且所有软素质 ≥ 3分。若两项以上5分则给S，否则给A。\n\n# Output Format\n请严格使用以下 Markdown 格式输出：\n\n### 📊 核心结论速览\n| 候选人姓名 | 最终判定 | 未识别项数 | 核心评语 (限50字内) |\n| ----- | ----- | ----- | ----- |\n| (自动提取) | S/A/B/C | N | 简要总结 |\n\n---\n### 📝 详细评估报告 (佐证记录区)\n#### 👤 1. 候选人基本画像\n#### 🧊 2. 冰山之上：知识与技能评估\n#### 🌊 3. 冰山之下：软性素质评估\n#### 💡 4. 优劣势与风险提示\n#### 🏁 5. 综合决策复盘`;
+    // 精准的 Prompt：移除了 JSON，强制使用标准的 11 列 Markdown 表格
+    const BASE_SYSTEM_PROMPT = `# Role\n你是一位就职于“北京贝塔科技”的资深游戏制作人兼主策划。任务是根据提供的【候选人简历】与【面试录音】，运用设定的【岗位素质模型】，客观、犀利、极度严格地评估候选人。\n\n# Task (核心纪律要求)\n1. 角色隔离防污染：绝不能将面试官的观点误认作候选人的产出。只评估独立表达内容！基于STAR法则深挖真实动机和卡点。\n2. 绝对客观防脑补：如果某项能力未提及或只有空洞套话，直接标记为“未识别”。必须有具体工具名、数据、卡点佐证。\n3. 严禁分数通胀：不轻易给5分！5分代表Top 5%的顶尖水平。必须有极具说服力的客观事实才能给4-5分。\n\n# 🧮 录用判定核心算法\n* 淘汰 (C)：显性技能中出现【较差】，或软素质中出现【1分/2分】。\n* 待定 (B)：统计所有“未识别”数量。如果【未识别】 > 1 个，触发熔断判定为待定。\n* 录用 (A/S)：未触碰红线且【未识别】 ≤ 1 个。且所有软素质 ≥ 3分。若两项以上5分则给S，否则给A。\n\n# Output Format\n请严格使用以下 Markdown 格式输出：\n\n### 📊 核心结论速览\n| 候选人姓名 | 最终判定 | AI工具实操 | 游戏拆解 | AI拥抱度 | 自驱力 | 游戏热爱 | 成就动机 | 抗压韧性 | 未识别项数 | 核心评语 (限50字内) |\n| ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |\n| (提取姓名) | S/A/B/C | 优秀/及格/较差/未识别 | 优秀/及格/较差/未识别 | (1-5分) | (1-5分) | (1-5分) | (1-5分) | (1-5分) | N | 简要总结 |\n\n---\n### 📝 详细评估报告 (佐证记录区)\n#### 👤 1. 候选人基本画像\n#### 🧊 2. 冰山之上：知识与技能评估\n#### 🌊 3. 冰山之下：软性素质评估\n#### 💡 4. 优劣势与风险提示\n#### 🏁 5. 综合决策复盘`;
 
     function App() {
       const [activeTab, setActiveTab] = useState('assessment'); 
@@ -133,7 +136,6 @@
       const [testResult, setTestResult] = useState(null); 
 
       // 业务状态
-      const [newSkill, setNewSkill] = useState({ type: 'hard', name: '', rubric: '' });
       const [genPosName, setGenPosName] = useState('');
       const [genHardSkills, setGenHardSkills] = useState('');
       const [genSoftSkills, setGenSoftSkills] = useState('');
@@ -141,6 +143,12 @@
       const [draftPosition, setDraftPosition] = useState(null); 
       const [refinePrompt, setRefinePrompt] = useState(''); 
       const [isRefining, setIsRefining] = useState(false);
+
+      // 解耦后的技能新增表单状态
+      const [newHardSkillName, setNewHardSkillName] = useState('');
+      const [newHardSkillRubric, setNewHardSkillRubric] = useState('');
+      const [newSoftSkillName, setNewSoftSkillName] = useState('');
+      const [newSoftSkillRubric, setNewSoftSkillRubric] = useState('');
 
       const [selectedPosId, setSelectedPosId] = useState(1);
       const [candidateName, setCandidateName] = useState('');
@@ -155,12 +163,11 @@
       const [currentRating, setCurrentRating] = useState('');
       const [currentParsedScores, setCurrentParsedScores] = useState(null);
 
-      // 新增：用于在档案库打开详情弹窗
+      // 用于在档案库打开详情弹窗
       const [selectedEval, setSelectedEval] = useState(null);
 
       const [manualPosition, setManualPosition] = useState({ name: '', description: '', skillIds: [] });
 
-      // 安全擦除功能
       const clearSecurityData = () => {
         if(window.confirm("确定要擦除浏览器本地保存的所有 API 配置信息吗？擦除后需要重新输入。")) {
            ['azure', 'deepseek', 'openai', 'gemini', 'siliconflow'].forEach(provider => {
@@ -290,16 +297,12 @@
 
       // 导出为 Word 的方法 (支持丰富排版)
       const downloadWord = (content, filename) => {
-        // 先剥离可能存在的 JSON 数据块，只导出正文报告
-        const cleanText = content.replace(/```json[\s\S]*?```/g, '');
-        // 借助 marked 将 md 转为 html
-        const htmlBody = marked.parse(cleanText);
-        
+        const htmlBody = marked.parse(content);
         const html = `
           <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
           <head>
               <meta charset="utf-8">
-              <title>Document</title>
+              <title>${filename}</title>
               <style>
                   body { font-family: 'Microsoft YaHei', 'SimSun', sans-serif; line-height: 1.6; color: #333; }
                   h1 { color: #1e3a8a; font-size: 24px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
@@ -312,12 +315,9 @@
                   blockquote { background: #f8fafc; border-left: 4px solid #cbd5e1; padding: 10px; margin: 10px 0; }
               </style>
           </head>
-          <body>
-              ${htmlBody}
-          </body>
+          <body>${htmlBody}</body>
           </html>
         `;
-        // 利用 Blob 将封装好的 HTML 伪装成 application/msword
         const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -327,13 +327,13 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast("已成功下载 Word 报告！", "success");
+        showToast("已成功下载原生 Word 报告！", "success");
       };
 
-      // 用于美化渲染 Markdown 并剔除 JSON 
+      // 用于美化渲染 Markdown
       const renderRichHTML = (text) => {
-        const cleanText = text.replace(/```json[\s\S]*?```/g, '');
-        return { __html: marked.parse(cleanText) };
+        if (!text) return { __html: '' };
+        return { __html: marked.parse(text) };
       };
 
       const generateInitialDraft = async () => {
@@ -379,6 +379,7 @@
         showToast(`画像《${draftPosition.name}》入库成功！`, "success");
       };
 
+      // 【核心重构】精准解析 Markdown 表格提取各维度分数
       const generateReport = async () => {
         if (!candidateName) return showToast("请先填候选人姓名！", "warning");
         if (!resumeText && !interviewText) return showToast("请上传候选人简历与面试录音文件！", "warning");
@@ -400,21 +401,25 @@
           const match = resText.match(/\|\s*S\/A\/B\/C\s*\|\s*([SABC])/i) || resText.match(/\|\s*([^|]+)\s*\|\s*([SABC])\s*\|/);
           setCurrentRating(match ? match[match.length - 1].toUpperCase() : 'B');
           
-          // 智能解析底部的 JSON 结构，提取各维度详细打分
+          // ✨ 从 Markdown 表格中硬抓取各项能力打分，彻底告别 JSON 失败率
           let extractedScores = { aiTools: '-', gameDecon: '-', aiAcc: '-', drive: '-', passion: '-', stress: '-' };
-          const jsonMatch = resText.match(/```json\n([\s\S]*?)\n```/);
-          if (jsonMatch) {
-            try {
-               const data = JSON.parse(jsonMatch[1]);
+          const lines = resText.split('\n');
+          // 找到包含名字的且是表格行的那一列，排除掉表头和分隔符
+          const dataLine = lines.find(line => line.includes('|') && line.replace(/\s/g,'').includes(`|${candidateName.replace(/\s/g,'')}`) && !line.includes('---'));
+          
+          if (dataLine) {
+            // 切割出数组，Markdown表格首尾各有一个空串，所以从索引 1 开始计算
+            const parts = dataLine.split('|').map(s => s.trim());
+            if (parts.length >= 10) {
                extractedScores = {
-                   aiTools: data.knowledge_and_skills?.ai_tools?.score || '-',
-                   gameDecon: data.knowledge_and_skills?.game_deconstruction?.score || '-',
-                   aiAcc: data.soft_skills?.ai_acceptance?.score || '-',
-                   drive: data.soft_skills?.self_drive?.score || '-',
-                   passion: data.soft_skills?.game_passion?.score || '-',
-                   stress: data.soft_skills?.stress_resistance?.score || '-'
+                   aiTools: parts[3] || '-',
+                   gameDecon: parts[4] || '-',
+                   aiAcc: parts[5] || '-',
+                   drive: parts[6] || '-',
+                   passion: parts[7] || '-',
+                   stress: parts[9] || '-' // 注意索引8通常是成就动机，9是抗压力
                };
-            } catch(e) { console.warn("解析 JSON 报告数据失败，部分维度将显示缺失。"); }
+            }
           }
           setCurrentParsedScores(extractedScores);
           showToast("智能打分报告生成完毕！", "success");
@@ -433,7 +438,7 @@
             positionName: pos?.name || '未知', 
             rating: currentRating, 
             reportResult,
-            scores: currentParsedScores || {} // 保存具体维度打分
+            scores: currentParsedScores || {} // 保存被精准切分出来的具体维度打分
         }, ...evaluations]);
         showToast(`候选人 ${candidateName} 的记录已成功收录至台账！`, "success");
       };
@@ -446,7 +451,7 @@
         });
         const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `贝塔科技面试台账_${new Date().toLocaleDateString()}.csv`);
         document.body.appendChild(link); link.click(); link.remove();
-        showToast("成功导出 CSV 表格", "success");
+        showToast("成功导出 Excel 台账 (CSV格式)", "success");
       };
 
       const togglePosSkill = (skillId) => setManualPosition(prev => ({...prev, skillIds: prev.skillIds.includes(skillId) ? prev.skillIds.filter(id => id !== skillId) : [...prev.skillIds, skillId]}));
@@ -454,21 +459,31 @@
         if (!manualPosition.name || manualPosition.skillIds.length === 0) return showToast("名称和所需能力不能为空！", "warning");
         setPositions([...positions, { ...manualPosition, id: Date.now() }]);
         setManualPosition({ name: '', description: '', skillIds: [] });
-        showToast("手动画像组合入库成功！", "success");
+        showToast("手工画像组合入库成功！", "success");
       };
-      const handleAddSkill = () => {
-        if (!newSkill.name || !newSkill.rubric) return showToast("请填写完整的名称和界定标准！", "warning");
-        setSkills([...skills, { ...newSkill, id: Date.now() }]);
-        setNewSkill({ type: 'hard', name: '', rubric: '' });
-        showToast("新原子能力收录成功！", "success");
+      
+      const handleAddSpecificSkill = (type, name, rubric) => {
+        if (!name || !rubric) return showToast("请填写完整的名称和界定标准！", "warning");
+        setSkills([...skills, { id: Date.now(), type, name, rubric }]);
+        if (type === 'hard') { setNewHardSkillName(''); setNewHardSkillRubric(''); }
+        else { setNewSoftSkillName(''); setNewSoftSkillRubric(''); }
+        showToast("新原子能力已收录至本区！", "success");
       };
+      
       const handleDeleteItem = (id, type) => {
-        if (type === 'skill') { setSkills(skills.filter(s => s.id !== id)); setPositions(positions.map(p => ({ ...p, skillIds: p.skillIds.filter(sid => sid !== id) }))); showToast("已删除。", "info");}
-        else if (type === 'position') { if (positions.length <= 1) return showToast("必须保留至少一个画像。", "warning"); setPositions(positions.filter(p => p.id !== id)); showToast("已删除。", "info");}
-        else if (type === 'eval') { setEvaluations(evaluations.filter(e => e.id !== id)); showToast("已删除。", "info");}
+        if (type === 'skill') { setSkills(skills.filter(s => s.id !== id)); setPositions(positions.map(p => ({ ...p, skillIds: p.skillIds.filter(sid => sid !== id) }))); showToast("能力已删除，并同步更新关联画像。", "info");}
+        else if (type === 'position') { if (positions.length <= 1) return showToast("必须保留至少一个画像。", "warning"); setPositions(positions.filter(p => p.id !== id)); showToast("画像已删除。", "info");}
+        else if (type === 'eval') { setEvaluations(evaluations.filter(e => e.id !== id)); showToast("档案已删除。", "info");}
       };
 
-      // 高级文件上传组件（一键触发、支持原生 label）
+      // 档案库的分组逻辑
+      const groupedEvaluations = evaluations.reduce((acc, ev) => {
+          if (!acc[ev.positionName]) acc[ev.positionName] = [];
+          acc[ev.positionName].push(ev);
+          return acc;
+      }, {});
+
+      // 高级文件上传组件
       const FileUploadZone = ({ title, iconClass, textState, setTextState, fileNameState, setFileNameState }) => {
         const [isParsing, setIsParsing] = useState(false);
         const [inputMode, setInputMode] = useState('file'); 
@@ -526,41 +541,40 @@
                 <i className={`${iconClass} mr-2`}></i> {title}
               </span>
               <div className="flex space-x-2">
-                 <button onClick={() => setInputMode('file')} className={`text-xs px-2 py-1 rounded transition-colors ${inputMode==='file'?'bg-gray-200 font-bold text-gray-800':'text-gray-500 hover:bg-gray-100'}`}>文件上传</button>
-                 <button onClick={() => setInputMode('text')} className={`text-xs px-2 py-1 rounded transition-colors ${inputMode==='text'?'bg-gray-200 font-bold text-gray-800':'text-gray-500 hover:bg-gray-100'}`}>手动粘贴</button>
+                 <button onClick={() => setInputMode('file')} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${inputMode==='file'?'bg-indigo-100 font-bold text-indigo-700 border border-indigo-200':'text-gray-500 hover:bg-gray-200'}`}>一键传文档</button>
+                 <button onClick={() => setInputMode('text')} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${inputMode==='text'?'bg-indigo-100 font-bold text-indigo-700 border border-indigo-200':'text-gray-500 hover:bg-gray-200'}`}>手贴原文本</button>
               </div>
             </div>
             {inputMode === 'file' ? (
               <div className="flex-1 flex flex-col justify-center">
                 {isParsing ? (
-                  <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-xl bg-white w-full">
-                    <i className="fa-solid fa-spinner fa-spin text-blue-500 text-2xl mb-2"></i>
-                    <span className="text-sm text-gray-500 font-medium">极速解析中...</span>
+                  <div className="flex flex-col items-center justify-center h-full min-h-[140px] border-2 border-dashed border-gray-300 rounded-xl bg-white w-full">
+                    <i className="fa-solid fa-spinner fa-spin text-blue-500 text-3xl mb-3"></i>
+                    <span className="text-sm text-gray-500 font-bold tracking-widest">极速解析中...</span>
                   </div>
                 ) : fileNameState ? (
-                  <div className="flex items-center justify-between p-4 border border-emerald-200 bg-emerald-50 rounded-xl shadow-sm relative group overflow-hidden w-full">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+                  <div className="flex items-center justify-between p-5 border-2 border-emerald-200 bg-emerald-50/50 rounded-xl shadow-sm relative overflow-hidden w-full h-full min-h-[140px]">
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
                     <div className="flex items-center">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg mr-3 shadow-inner"><i className={`fa-solid ${fileNameState.endsWith('.pdf') ? 'fa-file-pdf' : fileNameState.endsWith('.docx') ? 'fa-file-word' : 'fa-file-lines'}`}></i></div>
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl mr-4 shadow-inner"><i className={`fa-solid ${fileNameState.endsWith('.pdf') ? 'fa-file-pdf' : fileNameState.endsWith('.docx') ? 'fa-file-word' : 'fa-file-lines'}`}></i></div>
                       <div className="overflow-hidden">
-                        <p className="text-sm font-bold text-gray-800 truncate w-48" title={fileNameState}>{fileNameState}</p>
-                        <p className="text-xs text-emerald-600 mt-0.5"><i className="fa-solid fa-check-circle mr-1"></i>已成功提取文本</p>
+                        <p className="text-base font-bold text-gray-800 truncate w-48" title={fileNameState}>{fileNameState}</p>
+                        <p className="text-sm text-emerald-600 mt-1 font-bold"><i className="fa-solid fa-check-circle mr-1"></i>已成功提取纯文本</p>
                       </div>
                     </div>
-                    <button onClick={() => { setFileNameState(''); setTextState(''); }} className="text-gray-400 hover:text-red-500 transition-colors p-2" title="移除文件"><i className="fa-solid fa-xmark text-lg"></i></button>
+                    <button onClick={() => { setFileNameState(''); setTextState(''); }} className="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full w-10 h-10 flex items-center justify-center transition-colors" title="移除文件"><i className="fa-solid fa-trash-can text-lg"></i></button>
                   </div>
                 ) : (
-                  // 原生 label 标签彻底解决“需点击两下”的 Bug，无论怎么点击都能瞬间唤起本地文件框
-                  <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/50 hover:bg-blue-50 hover:border-blue-400 cursor-pointer transition-colors group w-full">
+                  <label className="flex flex-col items-center justify-center h-full min-h-[140px] border-2 border-dashed border-blue-300 rounded-xl bg-blue-50/50 hover:bg-blue-100 hover:border-blue-500 cursor-pointer transition-all group w-full">
                     <input type="file" accept=".txt,.md,.pdf,.docx" className="hidden" onChange={handleUpload} />
-                    <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-blue-500 mb-2 group-hover:scale-110 transition-transform"><i className="fa-solid fa-cloud-arrow-up text-xl"></i></div>
-                    <span className="text-sm font-bold text-blue-600">点击上传文档</span>
-                    <span className="text-xs text-gray-400 mt-1">支持 PDF、DOCX、TXT</span>
+                    <div className="w-14 h-14 bg-white rounded-full shadow-md flex items-center justify-center text-blue-600 mb-3 group-hover:scale-110 transition-transform group-hover:bg-blue-600 group-hover:text-white"><i className="fa-solid fa-arrow-up-from-bracket text-2xl"></i></div>
+                    <span className="text-base font-bold text-blue-700">点击此处一键上传文档</span>
+                    <span className="text-xs text-blue-400 mt-1.5 font-medium tracking-wide">支持无损解析 PDF、Word(docx)、TXT</span>
                   </label>
                 )}
               </div>
             ) : (
-              <textarea value={textState} onChange={e => { setTextState(e.target.value); setFileNameState(''); }} placeholder="在此处粘贴纯文本..." className="w-full flex-1 min-h-[140px] p-3 rounded-lg border border-gray-200 outline-none focus:border-blue-400 text-sm leading-relaxed custom-scrollbar bg-white resize-y" />
+              <textarea value={textState} onChange={e => { setTextState(e.target.value); setFileNameState(''); }} placeholder="在此处粘贴纯文本内容..." className="w-full flex-1 min-h-[140px] p-4 rounded-xl border-2 border-gray-200 outline-none focus:border-blue-400 text-sm leading-relaxed custom-scrollbar bg-white resize-y" />
             )}
           </div>
         );
@@ -593,6 +607,7 @@
             </div>
           </header>
 
+          {/* 模态框：API设置 */}
           {showApiSettings && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-lg animate-fadeIn max-h-[95vh] overflow-y-auto custom-scrollbar">
@@ -715,27 +730,27 @@
             </div>
           )}
 
-          {/* 新增：档案库详细报告弹窗 */}
+          {/* 模态框：档案库详细报告弹窗 */}
           {selectedEval && (
-            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-8">
+            <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-8">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-fadeInUp">
-                <div className="flex justify-between items-center p-6 border-b bg-slate-50 rounded-t-2xl">
-                  <h2 className="text-xl font-bold text-gray-800 flex items-center">
-                    <i className="fa-solid fa-file-lines mr-3 text-blue-600 text-2xl"></i>
-                    {selectedEval.candidateName} 的面试评估归档报告
+                <div className="flex justify-between items-center p-6 border-b-2 border-slate-100 bg-slate-50 rounded-t-2xl">
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                    <i className="fa-solid fa-file-signature mr-3 text-blue-600 text-2xl"></i>
+                    {selectedEval.candidateName} 的详细评估报告
                   </h2>
-                  <button onClick={() => setSelectedEval(null)} className="text-gray-400 hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50"><i className="fa-solid fa-xmark text-xl"></i></button>
+                  <button onClick={() => setSelectedEval(null)} className="text-slate-400 hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50"><i className="fa-solid fa-xmark text-xl"></i></button>
                 </div>
                 
-                {/* 使用美化的 Markdown 渲染容器 */}
-                <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-white">
-                  <div className="markdown-container" dangerouslySetInnerHTML={renderRichHTML(selectedEval.reportResult)}></div>
+                <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-white relative">
+                  {/* 极致美化渲染容器 */}
+                  <div className="markdown-container relative z-10" dangerouslySetInnerHTML={renderRichHTML(selectedEval.reportResult)}></div>
                 </div>
                 
-                <div className="p-5 border-t bg-slate-50 flex justify-end rounded-b-2xl items-center">
-                  <span className="text-xs text-gray-400 mr-auto font-mono"><i className="fa-solid fa-clock mr-1"></i>评估时间：{selectedEval.date}</span>
-                  <button onClick={() => downloadWord(selectedEval.reportResult, `${selectedEval.candidateName}_评估报告`)} className="px-6 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-bold text-sm shadow-md mr-3 transition-transform hover:-translate-y-0.5"><i className="fa-solid fa-file-word mr-2"></i> 导出原生 Word</button>
-                  <button onClick={() => setSelectedEval(null)} className="px-6 py-2.5 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg font-bold text-sm transition-colors">关闭</button>
+                <div className="p-5 border-t-2 border-slate-100 bg-slate-50 flex justify-end rounded-b-2xl items-center">
+                  <span className="text-xs text-slate-400 mr-auto font-mono bg-white px-3 py-1.5 rounded-full border border-slate-200"><i className="fa-solid fa-clock mr-1.5"></i>归档时间：{selectedEval.date}</span>
+                  <button onClick={() => downloadWord(selectedEval.reportResult, `${selectedEval.candidateName}_评估报告`)} className="px-6 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-bold text-sm shadow-md mr-3 transition-transform hover:-translate-y-0.5"><i className="fa-solid fa-file-word mr-2"></i> 导出原生 Word 文档</button>
+                  <button onClick={() => setSelectedEval(null)} className="px-6 py-2.5 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl font-bold text-sm transition-colors">关闭窗口</button>
                 </div>
               </div>
             </div>
@@ -745,140 +760,143 @@
             {/* 工作台 */}
             {activeTab === 'assessment' && (
               <div className="space-y-6 animate-fadeIn">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                  <h2 className="text-xl font-bold mb-6 flex items-center border-b pb-4"><i className="fa-solid fa-bullseye mr-2 text-blue-600"></i> 核心评估工作台</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+                  <h2 className="text-2xl font-black mb-6 flex items-center border-b-2 border-slate-100 pb-4 text-slate-800"><i className="fa-solid fa-bullseye mr-3 text-blue-600"></i> 核心评估工作台</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                      <label className="block text-sm font-bold mb-2 text-gray-700">1. 调取评估基准画像</label>
-                      <select value={selectedPosId} onChange={(e) => setSelectedPosId(e.target.value)} className="w-full border-2 rounded-xl p-3 bg-blue-50/30 outline-none font-medium">
+                      <label className="block text-sm font-bold mb-3 text-slate-700">1. 调取评估基准画像</label>
+                      <select value={selectedPosId} onChange={(e) => setSelectedPosId(e.target.value)} className="w-full border-2 border-blue-100 rounded-xl p-3.5 bg-blue-50/50 outline-none font-bold text-slate-800 focus:border-blue-500 focus:bg-white transition-all shadow-sm">
                         {positions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-bold mb-2 text-gray-700">2. 候选人姓名</label>
-                      <input type="text" value={candidateName} onChange={e=>setCandidateName(e.target.value)} placeholder="必填" className="w-full border-2 rounded-xl p-3 outline-none focus:border-blue-500 font-bold text-lg" />
+                      <label className="block text-sm font-bold mb-3 text-slate-700">2. 候选人姓名</label>
+                      <input type="text" value={candidateName} onChange={e=>setCandidateName(e.target.value)} placeholder="必填" className="w-full border-2 border-slate-200 rounded-xl p-3.5 outline-none focus:border-blue-500 font-bold text-lg shadow-sm" />
                     </div>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 h-56">
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 h-[280px]">
                     <FileUploadZone 
-                      title="候选人简历" 
-                      iconClass="fa-solid fa-address-card text-indigo-500"
+                      title="候选人简历源文件" 
+                      iconClass="fa-solid fa-address-card text-indigo-500 text-lg"
                       textState={resumeText} setTextState={setResumeText}
                       fileNameState={resumeFileName} setFileNameState={setResumeFileName}
                     />
                     <FileUploadZone 
                       title="面试速记文本" 
-                      iconClass="fa-solid fa-microphone-lines text-emerald-500"
+                      iconClass="fa-solid fa-microphone-lines text-emerald-500 text-lg"
                       textState={interviewText} setTextState={setInterviewText}
                       fileNameState={interviewFileName} setFileNameState={setInterviewFileName}
                     />
                   </div>
                   
-                  <div className="mt-8 flex justify-center">
-                    <button onClick={generateReport} disabled={isGenerating} className={`px-12 py-4 rounded-xl font-bold text-white shadow-xl text-lg transition-transform ${isGenerating ? 'bg-blue-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-blue-600 hover:-translate-y-1'}`}>
-                      {isGenerating ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i> 模型极速研判中，请稍候...</> : <><i className="fa-solid fa-microchip mr-2"></i> 注入资料并开始打分</>}
+                  <div className="mt-10 flex justify-center border-t-2 border-slate-100 pt-8">
+                    <button onClick={generateReport} disabled={isGenerating} className={`px-14 py-4 rounded-full font-black text-white shadow-xl text-lg transition-all ${isGenerating ? 'bg-blue-400 cursor-not-allowed scale-95' : 'bg-gradient-to-r from-slate-900 to-slate-800 hover:from-blue-700 hover:to-indigo-600 hover:-translate-y-1 hover:shadow-2xl'}`}>
+                      {isGenerating ? <><i className="fa-solid fa-spinner fa-spin mr-3 text-xl"></i> 模型极速研判中，请稍候...</> : <><i className="fa-solid fa-microchip mr-3 text-xl"></i> 注入双核资料并开始严格打分</>}
                     </button>
                   </div>
                 </div>
                 
                 {reportResult && (
-                   <div className="bg-white p-8 rounded-2xl shadow-xl border-t-[6px] border-blue-600 mt-6 animate-fadeInUp">
-                    <div className="flex justify-between items-center mb-6 border-b pb-4">
-                      <h2 className="text-2xl font-bold flex items-center text-slate-800"><i className="fa-solid fa-file-signature mr-3 text-blue-600"></i> AI 智能判定报告</h2>
+                   <div className="bg-white p-8 rounded-2xl shadow-2xl border-t-[8px] border-blue-600 mt-8 animate-fadeInUp relative overflow-hidden">
+                    <div className="absolute top-0 right-0 bg-blue-50 px-6 py-2 rounded-bl-2xl font-bold text-blue-600 text-sm shadow-sm"><i className="fa-solid fa-check-circle mr-1.5"></i> 研判完成</div>
+                    <div className="flex justify-between items-center mb-6 border-b-2 border-slate-100 pb-4 mt-2">
+                      <h2 className="text-2xl font-black flex items-center text-slate-800"><i className="fa-solid fa-file-signature mr-3 text-blue-600"></i> AI 智能判定报告</h2>
                       <div className="flex space-x-3">
-                        <button onClick={saveToArchive} className="px-5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-lg font-bold text-sm shadow-sm transition-all"><i className="fa-solid fa-box-archive mr-2"></i> 一键收录台账</button>
-                        {/* 换成了原生 Word 下载按钮 */}
-                        <button onClick={() => downloadWord(reportResult, `${candidateName}_评估报告`)} className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-bold text-sm shadow-md transition-all hover:-translate-y-0.5"><i className="fa-solid fa-file-word mr-2"></i> 下载为 Word 文档</button>
+                        <button onClick={saveToArchive} className="px-5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl font-bold text-sm shadow-sm transition-all"><i className="fa-solid fa-box-archive mr-2"></i> 一键收录至台账</button>
+                        <button onClick={() => downloadWord(reportResult, `${candidateName}_评估报告`)} className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-bold text-sm shadow-md transition-all hover:-translate-y-0.5"><i className="fa-solid fa-file-word mr-2"></i> 下载原生 Word (.doc)</button>
                       </div>
                     </div>
-                    {/* 使用美化后的 UI 组件容器渲染结果 */}
-                    <div className="markdown-container bg-slate-50/50 p-6 rounded-xl border border-gray-100" dangerouslySetInnerHTML={renderRichHTML(reportResult)}></div>
+                    {/* 美化的呈现区块 */}
+                    <div className="bg-slate-50/50 p-6 rounded-xl border border-slate-100 shadow-inner">
+                       <div className="markdown-container" dangerouslySetInnerHTML={renderRichHTML(reportResult)}></div>
+                    </div>
                    </div>
                 )}
               </div>
             )}
 
-            {/* 其它模块保持不变 */}
+            {/* AI Copilot 画像生成与拼装 */}
             {activeTab === 'positions' && (
               <div className="space-y-6 animate-fadeIn">
-                <div className="bg-slate-900 p-6 rounded-2xl shadow-lg text-white">
-                   <h2 className="text-xl font-bold mb-2 flex items-center"><i className="fa-solid fa-wand-magic-sparkles mr-2 text-indigo-400"></i> AI Copilot 对话式画像生成器</h2>
-                   <p className="text-gray-400 text-sm mb-5">输入技能词汇，大模型自动生成严格 1-5 分判断标准。随后可用对话修改直到满意。</p>
+                <div className="bg-slate-900 p-8 rounded-2xl shadow-2xl text-white relative overflow-hidden">
+                   <div className="absolute -top-10 -right-10 opacity-10"><i className="fa-solid fa-wand-magic-sparkles text-[150px]"></i></div>
+                   <h2 className="text-2xl font-black mb-2 flex items-center relative z-10"><i className="fa-solid fa-wand-magic-sparkles mr-3 text-indigo-400"></i> AI Copilot 对话式画像生成器</h2>
+                   <p className="text-slate-400 text-sm mb-6 relative z-10">输入技能词汇，大模型自动生成严格 1-5 分判断标准。生成后可通过对话反复修改直至满意。</p>
                    {!draftPosition ? (
-                     <div className="space-y-4">
-                       <input value={genPosName} onChange={e=>setGenPosName(e.target.value)} placeholder="输入要招聘的岗位名称 (例：资深海外买量)" className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl p-3 outline-none focus:border-indigo-500 font-bold" />
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <textarea value={genHardSkills} onChange={e=>setGenHardSkills(e.target.value)} placeholder="列出必须具备的硬技能 (用逗号分隔)\n例如: 投放漏斗拆解, A/B Test实操" className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl p-3 h-24 outline-none focus:border-indigo-500 text-sm"></textarea>
-                         <textarea value={genSoftSkills} onChange={e=>setGenSoftSkills(e.target.value)} placeholder="列出需要的软素质 (用逗号分隔)\n例如: 商业化同理心, 极致抗压力" className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl p-3 h-24 outline-none focus:border-indigo-500 text-sm"></textarea>
+                     <div className="space-y-5 relative z-10">
+                       <input value={genPosName} onChange={e=>setGenPosName(e.target.value)} placeholder="输入要招聘的岗位名称 (例：资深海外买量)" className="w-full bg-slate-800/80 border-2 border-slate-700 rounded-xl p-4 outline-none focus:border-indigo-500 font-bold text-lg placeholder-slate-500 transition-colors" />
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                         <textarea value={genHardSkills} onChange={e=>setGenHardSkills(e.target.value)} placeholder="列出必须具备的硬技能 (用逗号分隔)\n例如: 投放漏斗拆解, A/B Test实操" className="w-full bg-slate-800/80 border-2 border-slate-700 rounded-xl p-4 h-28 outline-none focus:border-indigo-500 text-sm placeholder-slate-500 transition-colors"></textarea>
+                         <textarea value={genSoftSkills} onChange={e=>setGenSoftSkills(e.target.value)} placeholder="列出需要的软素质 (用逗号分隔)\n例如: 商业化同理心, 极致抗压力" className="w-full bg-slate-800/80 border-2 border-slate-700 rounded-xl p-4 h-28 outline-none focus:border-indigo-500 text-sm placeholder-slate-500 transition-colors"></textarea>
                        </div>
-                       <button onClick={generateInitialDraft} disabled={isGeneratingDraft} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-3 rounded-xl font-bold shadow-lg transition-all w-full md:w-auto">
-                          {isGeneratingDraft ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i> 草拟标准中...</> : <><i className="fa-solid fa-bolt mr-2"></i> 生成初版评分标准</>}
+                       <button onClick={generateInitialDraft} disabled={isGeneratingDraft} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-xl font-bold shadow-lg transition-all w-full md:w-auto text-lg flex items-center justify-center">
+                          {isGeneratingDraft ? <><i className="fa-solid fa-spinner fa-spin mr-3"></i> 正在构建极其严苛的标准中...</> : <><i className="fa-solid fa-bolt mr-3"></i> 一键生成初版评分标准</>}
                        </button>
                      </div>
                    ) : (
-                     <div className="bg-white text-slate-800 rounded-xl p-6 shadow-2xl mt-4 border-t-4 border-indigo-500">
-                       <h3 className="text-lg font-bold text-indigo-700 mb-4 border-b pb-2"><i className="fa-solid fa-square-check mr-2"></i> 请审核草稿：{draftPosition.name}</h3>
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 h-64 overflow-y-auto custom-scrollbar pr-3">
+                     <div className="bg-white text-slate-800 rounded-2xl p-6 shadow-2xl mt-4 border-t-8 border-indigo-500 relative z-10 animate-fadeInUp">
+                       <h3 className="text-xl font-black text-indigo-800 mb-4 border-b-2 border-slate-100 pb-3"><i className="fa-solid fa-square-check mr-2"></i> 请审核并调优草稿：{draftPosition.name}</h3>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 h-72 overflow-y-auto custom-scrollbar pr-3">
                          <div>
-                           <h4 className="font-bold text-blue-700 mb-2 bg-blue-50 p-2 rounded">🧊 硬技能界定</h4>
-                           {draftPosition.skills.filter(s=>s.type==='hard').map((s,i)=><div key={i} className="mb-4 pl-3 border-l-2 border-blue-300"><b className="text-sm">{s.name}</b><p className="text-xs text-gray-600 whitespace-pre-wrap mt-1 leading-relaxed">{s.rubric}</p></div>)}
+                           <h4 className="font-bold text-blue-800 mb-3 bg-blue-50/80 p-2.5 rounded-lg border border-blue-100 sticky top-0 z-10 backdrop-blur-sm"><i className="fa-solid fa-microchip mr-2"></i> 🧊 冰山之上：硬技能界定</h4>
+                           {draftPosition.skills.filter(s=>s.type==='hard').map((s,i)=><div key={i} className="mb-4 pl-3 border-l-[3px] border-blue-400"><b className="text-sm font-bold">{s.name}</b><p className="text-xs text-slate-600 whitespace-pre-wrap mt-1.5 leading-relaxed bg-slate-50 p-2 rounded">{s.rubric}</p></div>)}
                          </div>
                          <div>
-                           <h4 className="font-bold text-emerald-700 mb-2 bg-emerald-50 p-2 rounded">🌊 软素质界定</h4>
-                           {draftPosition.skills.filter(s=>s.type==='soft').map((s,i)=><div key={i} className="mb-4 pl-3 border-l-2 border-emerald-300"><b className="text-sm">{s.name}</b><p className="text-xs text-gray-600 whitespace-pre-wrap mt-1 leading-relaxed">{s.rubric}</p></div>)}
+                           <h4 className="font-bold text-emerald-800 mb-3 bg-emerald-50/80 p-2.5 rounded-lg border border-emerald-100 sticky top-0 z-10 backdrop-blur-sm"><i className="fa-solid fa-heart mr-2"></i> 🌊 冰山之下：软素质界定</h4>
+                           {draftPosition.skills.filter(s=>s.type==='soft').map((s,i)=><div key={i} className="mb-4 pl-3 border-l-[3px] border-emerald-400"><b className="text-sm font-bold">{s.name}</b><p className="text-xs text-slate-600 whitespace-pre-wrap mt-1.5 leading-relaxed bg-slate-50 p-2 rounded">{s.rubric}</p></div>)}
                          </div>
                        </div>
-                       <div className="bg-slate-50 p-4 rounded-xl flex space-x-3 mb-4 border border-slate-200">
-                         <input value={refinePrompt} onChange={e=>setRefinePrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefineDraft()} placeholder="觉得不够严苛？直接在这里提要求让 AI 修改" className="flex-1 border-2 border-gray-200 rounded-lg p-3 text-sm outline-none focus:border-indigo-400" />
-                         <button onClick={handleRefineDraft} disabled={isRefining} className="bg-slate-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-700 transition-colors">
+                       <div className="bg-slate-50 p-4 rounded-xl flex space-x-3 mb-5 border border-slate-200 shadow-sm">
+                         <input value={refinePrompt} onChange={e=>setRefinePrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefineDraft()} placeholder="觉得不够严苛？直接在这里提要求让 AI 局部修改" className="flex-1 border-2 border-slate-200 rounded-lg p-3 text-sm outline-none focus:border-indigo-500 bg-white" />
+                         <button onClick={handleRefineDraft} disabled={isRefining} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-600 transition-colors flex items-center">
                            {isRefining ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-comment-dots mr-2"></i>让 AI 调整</>}
                          </button>
                        </div>
-                       <div className="flex justify-end pt-3 border-t">
-                         <button onClick={()=>setDraftPosition(null)} className="px-5 py-2 mr-3 text-gray-500 font-medium">舍弃重做</button>
-                         <button onClick={confirmAndSaveDraft} className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition-all hover:-translate-y-0.5">极其满意，沉淀入库</button>
+                       <div className="flex justify-end pt-4 border-t-2 border-slate-100">
+                         <button onClick={()=>setDraftPosition(null)} className="px-6 py-3 mr-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-colors">舍弃重做</button>
+                         <button onClick={confirmAndSaveDraft} className="px-8 py-3 bg-indigo-600 text-white font-black rounded-xl shadow-md hover:bg-indigo-700 transition-all hover:-translate-y-0.5"><i className="fa-solid fa-download mr-2"></i> 极其满意，拆解并入库</button>
                        </div>
                      </div>
                    )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 col-span-1 h-fit">
-                    <h2 className="text-base font-bold mb-4 flex items-center border-b pb-2"><i className="fa-solid fa-puzzle-piece mr-2 text-blue-600"></i> 传统手工搭积木</h2>
-                    <input type="text" value={manualPosition.name} onChange={(e) => setManualPosition({...manualPosition, name: e.target.value})} placeholder="输入岗位名称" className="w-full mb-4 border-2 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm" />
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    <h2 className="text-lg font-bold mb-4 flex items-center border-b-2 border-slate-100 pb-3"><i className="fa-solid fa-puzzle-piece mr-2 text-blue-600"></i> 传统手工搭积木</h2>
+                    <input type="text" value={manualPosition.name} onChange={(e) => setManualPosition({...manualPosition, name: e.target.value})} placeholder="输入岗位名称" className="w-full mb-4 border-2 rounded-xl p-3 outline-none focus:border-blue-500 font-bold text-sm" />
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                       <div>
-                        <h4 className="font-bold text-indigo-700 text-xs mb-2">选硬技能</h4>
+                        <h4 className="font-bold text-indigo-700 text-xs mb-2 bg-indigo-50 p-1.5 rounded"><i className="fa-solid fa-microchip mr-1"></i> 选硬技能</h4>
                         {skills.filter(s => s.type === 'hard').map(skill => (
-                          <label key={skill.id} className="flex items-center p-1.5 hover:bg-indigo-50 rounded cursor-pointer"><input type="checkbox" checked={manualPosition.skillIds.includes(skill.id)} onChange={() => togglePosSkill(skill.id)} className="mr-2" /><span className="text-xs">{skill.name}</span></label>
+                          <label key={skill.id} className="flex items-center p-2 hover:bg-indigo-50/50 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-indigo-100 mb-1"><input type="checkbox" checked={manualPosition.skillIds.includes(skill.id)} onChange={() => togglePosSkill(skill.id)} className="mr-2.5 w-4 h-4 text-indigo-600 rounded" /><span className="text-xs font-medium">{skill.name}</span></label>
                         ))}
                       </div>
                       <div>
-                        <h4 className="font-bold text-emerald-700 text-xs mb-2">选软素质</h4>
+                        <h4 className="font-bold text-emerald-700 text-xs mb-2 bg-emerald-50 p-1.5 rounded"><i className="fa-solid fa-heart mr-1"></i> 选软素质</h4>
                         {skills.filter(s => s.type === 'soft').map(skill => (
-                          <label key={skill.id} className="flex items-center p-1.5 hover:bg-emerald-50 rounded cursor-pointer"><input type="checkbox" checked={manualPosition.skillIds.includes(skill.id)} onChange={() => togglePosSkill(skill.id)} className="mr-2" /><span className="text-xs">{skill.name}</span></label>
+                          <label key={skill.id} className="flex items-center p-2 hover:bg-emerald-50/50 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-emerald-100 mb-1"><input type="checkbox" checked={manualPosition.skillIds.includes(skill.id)} onChange={() => togglePosSkill(skill.id)} className="mr-2.5 w-4 h-4 text-emerald-600 rounded" /><span className="text-xs font-medium">{skill.name}</span></label>
                         ))}
                       </div>
                     </div>
-                    <button onClick={saveManualPosition} className="w-full mt-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow text-sm">组合入库</button>
+                    <button onClick={saveManualPosition} className="w-full mt-5 py-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 font-bold shadow-md transition-colors"><i className="fa-solid fa-link mr-2"></i>组合生成画像入库</button>
                   </div>
                   
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden col-span-2">
-                     <h2 className="text-base font-bold p-5 bg-slate-50 border-b flex items-center"><i className="fa-solid fa-briefcase mr-2 text-slate-500"></i> 已沉淀的岗位画像库 ({positions.length})</h2>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 max-h-[450px] overflow-y-auto custom-scrollbar">
+                     <h2 className="text-lg font-bold p-5 bg-slate-50 border-b-2 border-slate-100 flex items-center"><i className="fa-solid fa-briefcase mr-2 text-slate-500"></i> 已沉淀的岗位画像库 ({positions.length})</h2>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 p-5 max-h-[450px] overflow-y-auto custom-scrollbar">
                        {positions.map(pos => (
-                         <div key={pos.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-lg relative group bg-white transition-all flex flex-col justify-between">
+                         <div key={pos.id} className="border border-slate-200 rounded-xl p-5 hover:shadow-lg relative group bg-white transition-all flex flex-col justify-between hover:border-blue-300">
                            <div>
-                             <h3 className="font-bold mb-1 text-slate-800">{pos.name}</h3><p className="text-xs text-gray-500 mb-3 truncate">{pos.description||'能力项重组生成'}</p>
-                             <div className="flex flex-wrap gap-1">
+                             <h3 className="font-bold mb-1 text-slate-800 text-lg">{pos.name}</h3><p className="text-xs text-slate-400 mb-3 truncate">{pos.description||'能力项重组生成'}</p>
+                             <div className="flex flex-wrap gap-1.5">
                                {pos.skillIds.map(id => {
                                  const s = skills.find(sk => sk.id === id);
-                                 return s ? <span key={id} className={`text-[10px] px-1.5 py-0.5 rounded border ${s.type==='hard'?'bg-indigo-50 text-indigo-700 border-indigo-200':'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>{s.name}</span> : null;
+                                 return s ? <span key={id} className={`text-[10px] px-2 py-0.5 rounded-md border font-bold ${s.type==='hard'?'bg-indigo-50 text-indigo-700 border-indigo-200':'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>{s.name}</span> : null;
                                })}
                              </div>
                            </div>
-                           {positions.length > 1 && <button onClick={() => handleDeleteItem(pos.id, 'position')} className="absolute top-3 right-3 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 bg-white p-1 rounded transition-opacity"><i className="fa-solid fa-trash-can"></i></button>}
+                           {positions.length > 1 && <button onClick={() => handleDeleteItem(pos.id, 'position')} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 bg-white p-1.5 rounded transition-opacity"><i className="fa-solid fa-trash-can"></i></button>}
                          </div>
                        ))}
                      </div>
@@ -887,96 +905,136 @@
               </div>
             )}
 
-            {/* 深度重构了档案库：新增了多维分数展示与弹窗查看功能 */}
+            {/* 包含多维打分的精美档案库，并按岗位分组 */}
             {activeTab === 'archives' && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 animate-fadeIn">
-                <div className="flex justify-between items-center border-b pb-4 mb-4">
-                   <h2 className="text-xl font-bold flex items-center"><i className="fa-solid fa-box-archive mr-2 text-indigo-600"></i> 评估档案多维台账</h2>
-                   <button onClick={exportCSV} disabled={evaluations.length===0} className="px-5 py-2.5 bg-green-50 text-green-700 border border-green-200 rounded-lg font-bold text-sm hover:bg-green-100 disabled:opacity-50 transition-colors flex items-center"><i className="fa-solid fa-download mr-2"></i> 导出完整 CSV (支持 Excel)</button>
+              <div className="space-y-8 animate-fadeIn">
+                <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                   <h2 className="text-2xl font-black flex items-center text-slate-800"><i className="fa-solid fa-box-archive mr-3 text-indigo-600"></i> 评估档案多维台账</h2>
+                   <button onClick={exportCSV} disabled={evaluations.length===0} className="px-6 py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-sm hover:bg-emerald-100 disabled:opacity-50 transition-colors flex items-center shadow-sm"><i className="fa-solid fa-file-excel mr-2"></i> 导出 Excel 台账 (CSV)</button>
                 </div>
+                
                 {evaluations.length === 0 ? (
-                  <div className="py-16 text-center text-gray-400 font-medium">当前档案库为空，请先前往工作台评估候选人并收录。</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm min-w-[900px]">
-                      <thead className="bg-slate-50 text-gray-600 border-b">
-                        <tr>
-                            <th className="p-4 rounded-tl-lg whitespace-nowrap">评估日期</th>
-                            <th className="p-4 whitespace-nowrap">候选人</th>
-                            <th className="p-4 whitespace-nowrap text-center">最终判定</th>
-                            <th className="p-4 border-l border-r border-gray-200 bg-blue-50/30 text-center" colSpan="2">🧊 核心技能</th>
-                            <th className="p-4 border-r border-gray-200 bg-emerald-50/30 text-center" colSpan="4">🌊 软性素质 (5分制)</th>
-                            <th className="p-4 rounded-tr-lg text-center whitespace-nowrap">操作</th>
-                        </tr>
-                        <tr className="text-xs text-gray-500 bg-slate-50/50">
-                            <th></th><th></th><th></th>
-                            <th className="p-2 border-l border-gray-200 text-center font-medium">AI工具</th>
-                            <th className="p-2 border-r border-gray-200 text-center font-medium">游戏拆解</th>
-                            <th className="p-2 text-center font-medium">AI拥抱</th>
-                            <th className="p-2 text-center font-medium">自驱力</th>
-                            <th className="p-2 text-center font-medium">游戏热爱</th>
-                            <th className="p-2 border-r border-gray-200 text-center font-medium">抗压力</th>
-                            <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {evaluations.map(ev => {
-                          const s = ev.scores || {};
-                          return (
-                          <tr key={ev.id} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
-                            <td className="p-4 font-mono text-xs text-gray-500 whitespace-nowrap">{ev.date}</td>
-                            <td className="p-4 font-bold text-slate-800 whitespace-nowrap">
-                                {ev.candidateName}
-                                <div className="text-[10px] text-gray-400 font-normal mt-0.5">{ev.positionName}</div>
-                            </td>
-                            <td className="p-4 text-center">
-                                <span className={`font-black px-3 py-1.5 rounded-md text-sm shadow-sm ${['S','A'].includes(ev.rating) ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 text-white' : ev.rating === 'B' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white'}`}>{ev.rating}</span>
-                            </td>
-                            {/* 分数展示列 */}
-                            <td className="p-3 text-center border-l text-xs font-bold text-slate-700">{s.aiTools || '-'}</td>
-                            <td className="p-3 text-center border-r text-xs font-bold text-slate-700">{s.gameDecon || '-'}</td>
-                            <td className="p-3 text-center text-xs font-bold text-slate-700">{s.aiAcc || '-'}</td>
-                            <td className="p-3 text-center text-xs font-bold text-slate-700">{s.drive || '-'}</td>
-                            <td className="p-3 text-center text-xs font-bold text-slate-700">{s.passion || '-'}</td>
-                            <td className="p-3 text-center border-r text-xs font-bold text-slate-700">{s.stress || '-'}</td>
-                            
-                            <td className="p-4 text-center whitespace-nowrap">
-                                <button onClick={() => setSelectedEval(ev)} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded text-xs font-bold mr-2 transition-colors border border-blue-200"><i className="fa-solid fa-eye mr-1"></i>查看详细</button>
-                                <button onClick={() => handleDeleteItem(ev.id, 'eval')} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"><i className="fa-solid fa-trash-can"></i></button>
-                            </td>
-                          </tr>
-                        )})}
-                      </tbody>
-                    </table>
+                  <div className="bg-white rounded-2xl py-20 flex flex-col items-center justify-center text-slate-400 border border-gray-200">
+                    <i className="fa-solid fa-folder-open text-6xl mb-4 opacity-50"></i>
+                    <p className="font-bold text-lg">当前档案库为空</p>
+                    <p className="text-sm mt-1">请先前往工作台评估候选人并收录至此。</p>
                   </div>
+                ) : (
+                  Object.entries(groupedEvaluations).map(([posName, evs]) => (
+                    <div key={posName} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                      <div className="bg-slate-100/80 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                         <h3 className="text-lg font-black text-slate-800 flex items-center"><i className="fa-solid fa-briefcase text-indigo-500 mr-2 text-xl"></i> {posName}</h3>
+                         <span className="bg-white text-xs font-bold px-4 py-1.5 rounded-full text-slate-500 border border-slate-200 shadow-sm">共收录 {evs.length} 份档案</span>
+                      </div>
+                      <div className="overflow-x-auto custom-scrollbar pb-2">
+                        <table className="w-full text-left text-sm min-w-[1000px] border-collapse">
+                          <thead className="bg-white text-slate-700 border-b-2 border-slate-100">
+                            <tr>
+                                <th className="p-4 whitespace-nowrap font-bold">评估日期</th>
+                                <th className="p-4 whitespace-nowrap font-bold">候选人</th>
+                                <th className="p-4 whitespace-nowrap text-center font-bold">最终判定</th>
+                                <th className="p-4 border-l border-r border-white bg-blue-50/50 text-center font-bold" colSpan="2">🧊 核心硬技能</th>
+                                <th className="p-4 border-r border-white bg-emerald-50/50 text-center font-bold" colSpan="4">🌊 软性素质 (5分制)</th>
+                                <th className="p-4 text-center whitespace-nowrap font-bold">档案操作</th>
+                            </tr>
+                            <tr className="text-[11px] text-slate-500 bg-slate-50 uppercase tracking-wider">
+                                <th></th><th></th><th></th>
+                                <th className="p-2 border-l border-slate-200 text-center font-bold">AI工具</th>
+                                <th className="p-2 border-r border-slate-200 text-center font-bold">游戏拆解</th>
+                                <th className="p-2 text-center font-bold">AI拥抱</th>
+                                <th className="p-2 text-center font-bold">自驱力</th>
+                                <th className="p-2 text-center font-bold">游戏热爱</th>
+                                <th className="p-2 border-r border-slate-200 text-center font-bold">抗压力</th>
+                                <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {evs.map(ev => {
+                              const s = ev.scores || {};
+                              return (
+                              <tr key={ev.id} className="border-b border-slate-100 hover:bg-blue-50/60 transition-colors">
+                                <td className="p-4 font-mono text-xs text-slate-500 whitespace-nowrap">{ev.date}</td>
+                                <td className="p-4 font-black text-slate-800 whitespace-nowrap text-base">{ev.candidateName}</td>
+                                <td className="p-4 text-center">
+                                    <span className={`font-black px-4 py-1.5 rounded-lg text-sm shadow-sm ${['S','A'].includes(ev.rating) ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 text-white' : ev.rating === 'B' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white'}`}>{ev.rating}</span>
+                                </td>
+                                {/* 分数展示列 */}
+                                <td className="p-3 text-center border-l border-slate-100 text-sm font-bold text-slate-700 bg-blue-50/20">{s.aiTools || '-'}</td>
+                                <td className="p-3 text-center border-r border-slate-100 text-sm font-bold text-slate-700 bg-blue-50/20">{s.gameDecon || '-'}</td>
+                                <td className="p-3 text-center text-sm font-bold text-slate-700 bg-emerald-50/20">{s.aiAcc || '-'}</td>
+                                <td className="p-3 text-center text-sm font-bold text-slate-700 bg-emerald-50/20">{s.drive || '-'}</td>
+                                <td className="p-3 text-center text-sm font-bold text-slate-700 bg-emerald-50/20">{s.passion || '-'}</td>
+                                <td className="p-3 text-center border-r border-slate-100 text-sm font-bold text-slate-700 bg-emerald-50/20">{s.stress || '-'}</td>
+                                
+                                <td className="p-4 text-center whitespace-nowrap">
+                                    <button onClick={() => setSelectedEval(ev)} className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold mr-2 transition-colors border-2 border-blue-600 shadow-sm"><i className="fa-solid fa-eye mr-1.5"></i>查看详细</button>
+                                    <button onClick={() => handleDeleteItem(ev.id, 'eval')} className="p-2 text-slate-400 hover:text-white hover:bg-red-500 rounded-lg transition-colors border border-transparent hover:border-red-500"><i className="fa-solid fa-trash-can"></i></button>
+                                </td>
+                              </tr>
+                            )})}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             )}
 
+            {/* 双列解耦的原子能力库 */}
             {activeTab === 'skills' && (
-              <div className="space-y-6 animate-fadeIn">
-                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                    <h2 className="text-xl font-bold mb-4 flex items-center border-b pb-3"><i className="fa-solid fa-circle-plus mr-2 text-indigo-600"></i> 手动注入原子能力</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <select value={newSkill.type} onChange={(e) => setNewSkill({...newSkill, type: e.target.value})} className="border-2 rounded-xl p-3 outline-none focus:border-indigo-500 font-medium"><option value="hard">硬技能(知识/应用)</option><option value="soft">软素质(性格/特质)</option></select>
-                      <input type="text" value={newSkill.name} onChange={(e) => setNewSkill({...newSkill, name: e.target.value})} placeholder="输入能力名称" className="col-span-2 border-2 rounded-xl p-3 outline-none focus:border-indigo-500 font-medium" />
-                    </div>
-                    <textarea value={newSkill.rubric} onChange={(e) => setNewSkill({...newSkill, rubric: e.target.value})} placeholder="编写 1-5 分判断标准..." className="w-full border-2 rounded-xl p-3 h-24 outline-none focus:border-indigo-500 resize-y text-sm"></textarea>
-                    <div className="flex justify-end mt-4"><button onClick={handleAddSkill} className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-indigo-600 transition-colors shadow">收录入库</button></div>
-                 </div>
-                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                    <h2 className="text-xl font-bold mb-6 flex items-center border-b pb-3"><i className="fa-solid fa-layer-group mr-2 text-slate-500"></i> 原子能力池 ({skills.length}项)</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
-                       {skills.map(skill => (
-                         <div key={skill.id} className="border-2 border-gray-100 rounded-xl p-5 relative group bg-slate-50 hover:bg-white hover:shadow-md transition-all">
-                           <span className={`text-[10px] px-2 py-1 rounded font-bold border ${skill.type==='hard'?'bg-indigo-100 text-indigo-700 border-indigo-200':'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>{skill.type==='hard'?'硬技能':'软素质'}</span>
-                           <h3 className="font-bold mt-3 mb-2 text-slate-800">{skill.name}</h3>
-                           <p className="text-xs text-gray-600 whitespace-pre-wrap h-24 overflow-y-auto custom-scrollbar font-mono leading-relaxed bg-white p-2 rounded border border-gray-100">{skill.rubric}</p>
-                           <button onClick={() => handleDeleteItem(skill.id, 'skill')} className="absolute top-4 right-4 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity bg-white p-1 rounded shadow-sm border border-gray-200"><i className="fa-solid fa-trash-can"></i></button>
-                         </div>
-                       ))}
-                    </div>
-                 </div>
+              <div className="animate-fadeIn grid grid-cols-1 xl:grid-cols-2 gap-8">
+                
+                {/* 左侧：硬技能专区 */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full max-h-[85vh]">
+                   <div className="flex items-center mb-6 border-b-2 border-slate-100 pb-4">
+                     <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-2xl mr-4 font-black shadow-sm"><i className="fa-solid fa-microchip"></i></div>
+                     <h2 className="text-2xl font-black text-slate-800">显性硬技能区</h2>
+                   </div>
+                   
+                   <div className="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100 mb-6 shadow-inner">
+                     <h4 className="text-sm font-bold text-indigo-800 mb-3"><i className="fa-solid fa-plus-circle mr-1.5"></i>新增硬技能项</h4>
+                     <input type="text" value={newHardSkillName} onChange={(e) => setNewHardSkillName(e.target.value)} placeholder="输入名称 (例: 海外买量漏斗分析)" className="w-full mb-3 border-2 border-white rounded-lg p-3 outline-none focus:border-indigo-400 font-bold shadow-sm" />
+                     <textarea value={newHardSkillRubric} onChange={(e) => setNewHardSkillRubric(e.target.value)} placeholder="编写极其严苛的 1-5 分判断标准..." className="w-full mb-3 border-2 border-white rounded-lg p-3 h-24 outline-none focus:border-indigo-400 resize-y text-sm shadow-sm custom-scrollbar"></textarea>
+                     <button onClick={() => handleAddSpecificSkill('hard', newHardSkillName, newHardSkillRubric)} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-md">添加到本区</button>
+                   </div>
+
+                   <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-2">
+                     {skills.filter(s => s.type === 'hard').map(skill => (
+                       <div key={skill.id} className="border-2 border-slate-100 rounded-xl p-5 relative group bg-white hover:border-indigo-300 hover:shadow-md transition-all">
+                         <h3 className="font-bold mb-3 text-slate-800 text-base">{skill.name}</h3>
+                         <p className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">{skill.rubric}</p>
+                         <button onClick={() => handleDeleteItem(skill.id, 'skill')} className="absolute top-4 right-4 text-slate-300 hover:text-white opacity-0 group-hover:opacity-100 transition-colors bg-white hover:bg-red-500 p-1.5 rounded-lg border border-slate-200 hover:border-red-500 shadow-sm"><i className="fa-solid fa-trash-can"></i></button>
+                       </div>
+                     ))}
+                   </div>
+                </div>
+
+                {/* 右侧：软素质专区 */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full max-h-[85vh]">
+                   <div className="flex items-center mb-6 border-b-2 border-slate-100 pb-4">
+                     <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl mr-4 font-black shadow-sm"><i className="fa-solid fa-heart"></i></div>
+                     <h2 className="text-2xl font-black text-slate-800">底层软素质区</h2>
+                   </div>
+                   
+                   <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 mb-6 shadow-inner">
+                     <h4 className="text-sm font-bold text-emerald-800 mb-3"><i className="fa-solid fa-plus-circle mr-1.5"></i>新增软素质项</h4>
+                     <input type="text" value={newSoftSkillName} onChange={(e) => setNewSoftSkillName(e.target.value)} placeholder="输入名称 (例: 商业化同理心)" className="w-full mb-3 border-2 border-white rounded-lg p-3 outline-none focus:border-emerald-400 font-bold shadow-sm" />
+                     <textarea value={newSoftSkillRubric} onChange={(e) => setNewSoftSkillRubric(e.target.value)} placeholder="编写极其严苛的 1-5 分判断标准..." className="w-full mb-3 border-2 border-white rounded-lg p-3 h-24 outline-none focus:border-emerald-400 resize-y text-sm shadow-sm custom-scrollbar"></textarea>
+                     <button onClick={() => handleAddSpecificSkill('soft', newSoftSkillName, newSoftSkillRubric)} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition-colors shadow-md">添加到本区</button>
+                   </div>
+
+                   <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-2">
+                     {skills.filter(s => s.type === 'soft').map(skill => (
+                       <div key={skill.id} className="border-2 border-slate-100 rounded-xl p-5 relative group bg-white hover:border-emerald-300 hover:shadow-md transition-all">
+                         <h3 className="font-bold mb-3 text-slate-800 text-base">{skill.name}</h3>
+                         <p className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">{skill.rubric}</p>
+                         <button onClick={() => handleDeleteItem(skill.id, 'skill')} className="absolute top-4 right-4 text-slate-300 hover:text-white opacity-0 group-hover:opacity-100 transition-colors bg-white hover:bg-red-500 p-1.5 rounded-lg border border-slate-200 hover:border-red-500 shadow-sm"><i className="fa-solid fa-trash-can"></i></button>
+                       </div>
+                     ))}
+                   </div>
+                </div>
+
               </div>
             )}
           </main>
