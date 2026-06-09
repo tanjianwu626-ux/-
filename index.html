@@ -5,30 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>贝塔科技 智能面试枢纽</title>
   
-  <!-- 引入 Tailwind CSS 进行极速样式渲染 -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- 引入 FontAwesome 图标库 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- 引入 React 核心库 -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  
-  <!-- 引入 Babel 用于在浏览器实时编译 React 代码 -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- 引入 Mammoth.js 用于纯前端解析 Word (docx) 文档 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-  
-  <!-- 引入 PDF.js 用于纯前端解析 PDF 文档 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <script>
-    // 配置 PDF.js 的 Worker 路径
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-  </script>
-
-  <!-- 引入 marked.js 用于美化 Markdown 报告的渲染 -->
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <style>
@@ -40,7 +24,6 @@
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
     
-    /* 极致美化的报告渲染样式 */
     .markdown-container { color: #1e293b; font-size: 0.95rem; line-height: 1.8; }
     .markdown-container h1 { font-size: 1.5rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 1rem; color: #1e3a8a; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
     .markdown-container h1:first-child { margin-top: 0; }
@@ -82,8 +65,8 @@
       { id: 1, name: 'AI策划实习生 (默认严苛版)', description: '针对26届培养岗，重自驱与AI深度', skillIds: [1, 2, 3, 4, 5, 6, 7] }
     ];
 
-    // 精准的 Prompt：移除了 JSON，强制使用标准的 11 列 Markdown 表格
-    const BASE_SYSTEM_PROMPT = `# Role\n你是一位就职于“北京贝塔科技”的资深游戏制作人兼主策划。任务是根据提供的【候选人简历】与【面试录音】，运用设定的【岗位素质模型】，客观、犀利、极度严格地评估候选人。\n\n# Task (核心纪律要求)\n1. 角色隔离防污染：绝不能将面试官的观点误认作候选人的产出。只评估独立表达内容！基于STAR法则深挖真实动机和卡点。\n2. 绝对客观防脑补：如果某项能力未提及或只有空洞套话，直接标记为“未识别”。必须有具体工具名、数据、卡点佐证。\n3. 严禁分数通胀：不轻易给5分！5分代表Top 5%的顶尖水平。必须有极具说服力的客观事实才能给4-5分。\n\n# 🧮 录用判定核心算法\n* 淘汰 (C)：显性技能中出现【较差】，或软素质中出现【1分/2分】。\n* 待定 (B)：统计所有“未识别”数量。如果【未识别】 > 1 个，触发熔断判定为待定。\n* 录用 (A/S)：未触碰红线且【未识别】 ≤ 1 个。且所有软素质 ≥ 3分。若两项以上5分则给S，否则给A。\n\n# Output Format\n请严格使用以下 Markdown 格式输出：\n\n### 📊 核心结论速览\n| 候选人姓名 | 最终判定 | AI工具实操 | 游戏拆解 | AI拥抱度 | 自驱力 | 游戏热爱 | 成就动机 | 抗压韧性 | 未识别项数 | 核心评语 (限50字内) |\n| ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |\n| (提取姓名) | S/A/B/C | 优秀/及格/较差/未识别 | 优秀/及格/较差/未识别 | (1-5分) | (1-5分) | (1-5分) | (1-5分) | (1-5分) | N | 简要总结 |\n\n---\n### 📝 详细评估报告 (佐证记录区)\n#### 👤 1. 候选人基本画像\n#### 🧊 2. 冰山之上：知识与技能评估\n#### 🌊 3. 冰山之下：软性素质评估\n#### 💡 4. 优劣势与风险提示\n#### 🏁 5. 综合决策复盘`;
+    // 核心重构：去除了死板的 Output Format，改在每次请求时动态生成
+    const BASE_SYSTEM_PROMPT = `# Role\n你是一位就职于“北京贝塔科技”的资深游戏制作人兼主策划。任务是根据提供的【候选人简历】与【面试录音】，运用设定的【岗位素质模型】，客观、犀利、极度严格地评估候选人。\n\n# Task (核心纪律要求)\n1. 角色隔离防污染：绝不能将面试官的观点误认作候选人的产出。只评估独立表达内容！基于STAR法则深挖真实动机和卡点。\n2. 绝对客观防脑补：如果某项能力未提及或只有空洞套话，直接标记为“未识别”。必须有具体工具名、数据、卡点佐证。\n3. 严禁分数通胀：不轻易给5分！5分代表Top 5%的顶尖水平。必须有极具说服力的客观事实才能给4-5分。\n\n# 🧮 录用判定核心算法\n* 淘汰 (C)：显性技能中出现【较差】，或软素质中出现【1分/2分】。\n* 待定 (B)：统计所有“未识别”数量。如果【未识别】 > 1 个，触发熔断判定为待定。\n* 录用 (A/S)：未触碰红线且【未识别】 ≤ 1 个。且所有软素质 ≥ 3分。若两项以上5分则给S，否则给A。`;
 
     function App() {
       const [activeTab, setActiveTab] = useState('assessment'); 
@@ -96,7 +79,6 @@
       const [positions, setPositions] = useState(() => loadState('beta_positions', DEFAULT_POSITIONS));
       const [evaluations, setEvaluations] = useState(() => loadState('beta_evaluations', []));
 
-      // Toast 提示
       const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
       const showToast = (message, type = 'info') => {
         setToast({ show: true, message, type });
@@ -131,11 +113,9 @@
       });
 
       const [siliconflowModel, setSiliconflowModel] = useState(localStorage.getItem('siliconflow_model') || 'deepseek-ai/DeepSeek-V3');
-
       const [isTesting, setIsTesting] = useState(false);
       const [testResult, setTestResult] = useState(null); 
 
-      // 业务状态
       const [genPosName, setGenPosName] = useState('');
       const [genHardSkills, setGenHardSkills] = useState('');
       const [genSoftSkills, setGenSoftSkills] = useState('');
@@ -144,7 +124,6 @@
       const [refinePrompt, setRefinePrompt] = useState(''); 
       const [isRefining, setIsRefining] = useState(false);
 
-      // 解耦后的技能新增表单状态
       const [newHardSkillName, setNewHardSkillName] = useState('');
       const [newHardSkillRubric, setNewHardSkillRubric] = useState('');
       const [newSoftSkillName, setNewSoftSkillName] = useState('');
@@ -152,7 +131,6 @@
 
       const [selectedPosId, setSelectedPosId] = useState(1);
       const [candidateName, setCandidateName] = useState('');
-      
       const [resumeText, setResumeText] = useState('');
       const [interviewText, setInterviewText] = useState('');
       const [resumeFileName, setResumeFileName] = useState('');
@@ -163,9 +141,7 @@
       const [currentRating, setCurrentRating] = useState('');
       const [currentParsedScores, setCurrentParsedScores] = useState(null);
 
-      // 用于在档案库打开详情弹窗
       const [selectedEval, setSelectedEval] = useState(null);
-
       const [manualPosition, setManualPosition] = useState({ name: '', description: '', skillIds: [] });
 
       const clearSecurityData = () => {
@@ -234,11 +210,7 @@
             headers: { 'Content-Type': 'application/json', 'api-key': currentKey },
             body: JSON.stringify(payload)
           });
-          if (!res.ok) {
-            if (res.status === 401) throw new Error("401 未授权：请检查 API Key 是否正确填写，不能有多余空格。");
-            if (res.status === 404) throw new Error("404 找不到部署：请核对 Deployment Name 是否拼写正确。");
-            throw new Error(`请求被拒绝 (状态码: ${res.status})`);
-          }
+          if (!res.ok) throw new Error(`请求被拒绝 (状态码: ${res.status})`);
           const data = await res.json();
           return data.choices?.[0]?.message?.content;
 
@@ -255,7 +227,7 @@
             method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
             body: JSON.stringify(payload)
           });
-          if (!res.ok) throw new Error(`硅基流动 API 错误 ${res.status}：Key无效或余额不足。`);
+          if (!res.ok) throw new Error(`硅基流动 API 错误 ${res.status}`);
           const data = await res.json();
           return data.choices?.[0]?.message?.content;
 
@@ -272,7 +244,7 @@
             method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentKey}` },
             body: JSON.stringify(payload)
           });
-          if (!res.ok) throw new Error(`API 错误 ${res.status}：Key无效或未授权。`);
+          if (!res.ok) throw new Error(`API 错误 ${res.status}`);
           const data = await res.json();
           return data.choices?.[0]?.message?.content;
         }
@@ -288,14 +260,13 @@
         } catch (err) {
           let message = err.message;
           if (message.includes('Failed to fetch') || message.includes('TypeError')) {
-             if (llmProvider === 'azure') message = `❌ 拦截警报 (Failed to fetch)：\n微软 Azure 的门卫阻止了本次请求 (CORS 拦截)。\n\n【解决方案】：\n请登录 Azure 后台 -> 找到您的模型资源 -> 左侧点击「资源管理」-> 点击「CORS」-> 在"允许的源"中填入 * 或您的 GitHub 网址 -> 保存即可测通！`;
-             else message = `❌ 无法连接服务器 (Failed to fetch)：\n这可能是因为网络波动或该 API 不允许前端直接请求。推荐切换至“硅基流动(SiliconFlow)”测试。`;
+             if (llmProvider === 'azure') message = `❌ 拦截警报 (Failed to fetch)：\n微软 Azure 的门卫阻止了本次请求 (CORS 拦截)。\n\n请登录 Azure 后台 -> 资源管理 -> CORS -> 允许的源填入 * -> 保存即可测通！`;
+             else message = `❌ 无法连接服务器 (Failed to fetch)。推荐切换至“硅基流动(SiliconFlow)”测试。`;
           }
           setTestResult({ status: 'error', message });
         } finally { setIsTesting(false); }
       };
 
-      // 导出为 Word 的方法 (支持丰富排版)
       const downloadWord = (content, filename) => {
         const htmlBody = marked.parse(content);
         const html = `
@@ -330,7 +301,6 @@
         showToast("已成功下载原生 Word 报告！", "success");
       };
 
-      // 用于美化渲染 Markdown
       const renderRichHTML = (text) => {
         if (!text) return { __html: '' };
         return { __html: marked.parse(text) };
@@ -379,7 +349,7 @@
         showToast(`画像《${draftPosition.name}》入库成功！`, "success");
       };
 
-      // 【核心重构】精准解析 Markdown 表格提取各维度分数
+      // 【核心重构 1】全动态构建评估标准，提取分数时根据选定岗位的技能名提取
       const generateReport = async () => {
         if (!candidateName) return showToast("请先填候选人姓名！", "warning");
         if (!resumeText && !interviewText) return showToast("请上传候选人简历与面试录音文件！", "warning");
@@ -387,39 +357,44 @@
         if (!position) return;
         
         const posSkills = position.skillIds.map(id => skills.find(s => s.id === id)).filter(Boolean);
+        const allSkillNames = posSkills.map(s => s.name);
+        
+        // 动态构建大模型的输出表头结构，防止大模型胡编乱造列名
+        let dynamicOutputFormat = `# Output Format\n请严格使用以下 Markdown 格式输出：\n\n### 📊 核心结论速览\n| 候选人姓名 | 最终判定 | ${allSkillNames.join(' | ')} | 未识别项数 | 核心评语 (限50字内) |\n| --- | --- | ${allSkillNames.map(()=>'---').join(' | ')} | --- | --- |\n| (提取姓名) | S/A/B/C | ${allSkillNames.map(()=>'(填写具体分数或未识别)').join(' | ')} | N | 简要总结 |\n\n---\n### 📝 详细评估报告 (佐证记录区)\n#### 👤 1. 候选人基本画像\n#### 🧊 2. 冰山之上：知识与技能评估\n#### 🌊 3. 冰山之下：软性素质评估\n#### 💡 4. 优劣势与风险提示\n#### 🏁 5. 综合决策复盘`;
+
         let dynamicRubric = `# 评估标准：${position.name}\n## 🧊 知识与技能\n`;
         posSkills.filter(s => s.type === 'hard').forEach((s, i) => dynamicRubric += `**${i+1}. ${s.name}**\n${s.rubric}\n\n`);
         dynamicRubric += `## 🌊 软性素质\n`;
         posSkills.filter(s => s.type === 'soft').forEach((s, i) => dynamicRubric += `**${i+1}. ${s.name}**\n${s.rubric}\n\n`);
         
+        const fullSystemPrompt = `${BASE_SYSTEM_PROMPT}\n\n${dynamicOutputFormat}`;
+        
         setIsGenerating(true); setReportResult(''); setCurrentParsedScores(null);
         try {
-          const resText = await callLLM(BASE_SYSTEM_PROMPT, `${dynamicRubric}\n\n# 候选人\n【姓名】：${candidateName}\n【简历】：${resumeText}\n【录音】：${interviewText}`, 0.2);
+          const resText = await callLLM(fullSystemPrompt, `${dynamicRubric}\n\n# 候选人\n【姓名】：${candidateName}\n【简历】：${resumeText}\n【录音】：${interviewText}`, 0.2);
           setReportResult(resText || "未返回有效文本");
           
-          // 提取最终判定结果 S/A/B/C
           const match = resText.match(/\|\s*S\/A\/B\/C\s*\|\s*([SABC])/i) || resText.match(/\|\s*([^|]+)\s*\|\s*([SABC])\s*\|/);
           setCurrentRating(match ? match[match.length - 1].toUpperCase() : 'B');
           
-          // ✨ 从 Markdown 表格中硬抓取各项能力打分，彻底告别 JSON 失败率
-          let extractedScores = { aiTools: '-', gameDecon: '-', aiAcc: '-', drive: '-', passion: '-', stress: '-' };
+          // 【核心重构 2】精准匹配表头，解析所有动态分数
+          let extractedScores = {};
+          allSkillNames.forEach(name => extractedScores[name] = '-'); // 初始化全部为 -
+
           const lines = resText.split('\n');
-          // 找到包含名字的且是表格行的那一列，排除掉表头和分隔符
+          const headerLine = lines.find(line => line.includes('| 候选人姓名 |'));
           const dataLine = lines.find(line => line.includes('|') && line.replace(/\s/g,'').includes(`|${candidateName.replace(/\s/g,'')}`) && !line.includes('---'));
           
-          if (dataLine) {
-            // 切割出数组，Markdown表格首尾各有一个空串，所以从索引 1 开始计算
+          if (headerLine && dataLine) {
+            const headers = headerLine.split('|').map(s => s.trim());
             const parts = dataLine.split('|').map(s => s.trim());
-            if (parts.length >= 10) {
-               extractedScores = {
-                   aiTools: parts[3] || '-',
-                   gameDecon: parts[4] || '-',
-                   aiAcc: parts[5] || '-',
-                   drive: parts[6] || '-',
-                   passion: parts[7] || '-',
-                   stress: parts[9] || '-' // 注意索引8通常是成就动机，9是抗压力
-               };
-            }
+            
+            allSkillNames.forEach(skillName => {
+                const idx = headers.findIndex(h => h.includes(skillName));
+                if (idx !== -1 && idx < parts.length) {
+                    extractedScores[skillName] = parts[idx];
+                }
+            });
           }
           setCurrentParsedScores(extractedScores);
           showToast("智能打分报告生成完毕！", "success");
@@ -438,16 +413,40 @@
             positionName: pos?.name || '未知', 
             rating: currentRating, 
             reportResult,
-            scores: currentParsedScores || {} // 保存被精准切分出来的具体维度打分
+            scores: currentParsedScores || {} // 保存被精准抓取的动态技能分数
         }, ...evaluations]);
         showToast(`候选人 ${candidateName} 的记录已成功收录至台账！`, "success");
       };
 
+      // 向下兼容旧数据的帮助函数
+      const getScoreForDisplay = (evScores, skillName) => {
+          if (!evScores) return '-';
+          if (evScores[skillName]) return evScores[skillName];
+          // 兼容之前的硬编码 key
+          const legacyMap = { 'AI工具实操与落地': 'aiTools', '游戏系统/数值拆解': 'gameDecon', 'AI拥抱度与深度': 'aiAcc', '自驱力与落地精神': 'drive', '游戏热爱度': 'passion', '抗压韧性': 'stress' };
+          if (legacyMap[skillName] && evScores[legacyMap[skillName]]) return evScores[legacyMap[skillName]];
+          return '-';
+      };
+
       const exportCSV = () => {
-        let csvContent = "data:text/csv;charset=utf-8,\uFEFF评估日期,候选人姓名,应聘岗位,最终判定,AI工具实操,游戏系统拆解,AI拥抱度,自驱力,游戏热爱度,抗压能力\n";
+        // 动态收集出现过的所有技能名称
+        const allUniqueSkills = new Set();
+        evaluations.forEach(ev => {
+            if (ev.scores) {
+                Object.keys(ev.scores).forEach(k => {
+                    if(!['aiTools', 'gameDecon', 'aiAcc', 'drive', 'passion', 'stress'].includes(k)) {
+                        allUniqueSkills.add(k);
+                    }
+                });
+            }
+        });
+        ['AI工具实操与落地', '游戏系统/数值拆解', 'AI拥抱度与深度', '自驱力与落地精神', '游戏热爱度', '抗压韧性', '成就动机'].forEach(k => allUniqueSkills.add(k));
+        const skillsArray = Array.from(allUniqueSkills);
+
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF评估日期,候选人姓名,应聘岗位,最终判定," + skillsArray.join(',') + "\n";
         evaluations.forEach(e => {
-            const scores = e.scores || {};
-            csvContent += `${e.date},${e.candidateName},${e.positionName},${e.rating},${scores.aiTools||'-'},${scores.gameDecon||'-'},${scores.aiAcc||'-'},${scores.drive||'-'},${scores.passion||'-'},${scores.stress||'-'}\n`;
+            const scoreVals = skillsArray.map(sk => getScoreForDisplay(e.scores, sk));
+            csvContent += `${e.date},${e.candidateName},${e.positionName},${e.rating},${scoreVals.join(',')}\n`;
         });
         const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `贝塔科技面试台账_${new Date().toLocaleDateString()}.csv`);
         document.body.appendChild(link); link.click(); link.remove();
@@ -743,7 +742,6 @@
                 </div>
                 
                 <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-white relative">
-                  {/* 极致美化渲染容器 */}
                   <div className="markdown-container relative z-10" dangerouslySetInnerHTML={renderRichHTML(selectedEval.reportResult)}></div>
                 </div>
                 
@@ -905,7 +903,7 @@
               </div>
             )}
 
-            {/* 包含多维打分的精美档案库，并按岗位分组 */}
+            {/* 包含多维打分的精美档案库，并按岗位动态渲染表头 */}
             {activeTab === 'archives' && (
               <div className="space-y-8 animate-fadeIn">
                 <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
@@ -920,37 +918,49 @@
                     <p className="text-sm mt-1">请先前往工作台评估候选人并收录至此。</p>
                   </div>
                 ) : (
-                  Object.entries(groupedEvaluations).map(([posName, evs]) => (
+                  Object.entries(groupedEvaluations).map(([posName, evs]) => {
+                    // 【核心重构】针对每个岗位，动态提取其需要的硬技能和软素质作为表头
+                    const posDef = positions.find(p => p.name === posName);
+                    let hardSkillsList = [];
+                    let softSkillsList = [];
+                    if (posDef) {
+                      hardSkillsList = posDef.skillIds.map(id => skills.find(s => s.id === id)).filter(s => s && s.type === 'hard');
+                      softSkillsList = posDef.skillIds.map(id => skills.find(s => s.id === id)).filter(s => s && s.type === 'soft');
+                    } else if (evs.length > 0 && evs[0].scores) {
+                      // 兜底方案：如果岗位被删除了，回退遍历其分数key
+                      hardSkillsList = Object.keys(evs[0].scores).map(name => ({ id: name, name: name }));
+                    }
+
+                    return (
                     <div key={posName} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                       <div className="bg-slate-100/80 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
                          <h3 className="text-lg font-black text-slate-800 flex items-center"><i className="fa-solid fa-briefcase text-indigo-500 mr-2 text-xl"></i> {posName}</h3>
                          <span className="bg-white text-xs font-bold px-4 py-1.5 rounded-full text-slate-500 border border-slate-200 shadow-sm">共收录 {evs.length} 份档案</span>
                       </div>
                       <div className="overflow-x-auto custom-scrollbar pb-2">
-                        <table className="w-full text-left text-sm min-w-[1000px] border-collapse">
+                        <table className="w-full text-left text-sm border-collapse">
                           <thead className="bg-white text-slate-700 border-b-2 border-slate-100">
                             <tr>
                                 <th className="p-4 whitespace-nowrap font-bold">评估日期</th>
                                 <th className="p-4 whitespace-nowrap font-bold">候选人</th>
                                 <th className="p-4 whitespace-nowrap text-center font-bold">最终判定</th>
-                                <th className="p-4 border-l border-r border-white bg-blue-50/50 text-center font-bold" colSpan="2">🧊 核心硬技能</th>
-                                <th className="p-4 border-r border-white bg-emerald-50/50 text-center font-bold" colSpan="4">🌊 软性素质 (5分制)</th>
+                                {/* 动态合并硬技能列 */}
+                                {hardSkillsList.length > 0 && <th className="p-4 border-l border-r border-white bg-blue-50/50 text-center font-bold" colSpan={hardSkillsList.length}>🧊 核心硬技能</th>}
+                                {/* 动态合并软素质列 */}
+                                {softSkillsList.length > 0 && <th className="p-4 border-r border-white bg-emerald-50/50 text-center font-bold" colSpan={softSkillsList.length}>🌊 软性素质</th>}
                                 <th className="p-4 text-center whitespace-nowrap font-bold">档案操作</th>
                             </tr>
-                            <tr className="text-[11px] text-slate-500 bg-slate-50 uppercase tracking-wider">
+                            <tr className="text-[11px] text-slate-500 bg-slate-50 tracking-wider">
                                 <th></th><th></th><th></th>
-                                <th className="p-2 border-l border-slate-200 text-center font-bold">AI工具</th>
-                                <th className="p-2 border-r border-slate-200 text-center font-bold">游戏拆解</th>
-                                <th className="p-2 text-center font-bold">AI拥抱</th>
-                                <th className="p-2 text-center font-bold">自驱力</th>
-                                <th className="p-2 text-center font-bold">游戏热爱</th>
-                                <th className="p-2 border-r border-slate-200 text-center font-bold">抗压力</th>
+                                {/* 动态渲染硬技能表头 */}
+                                {hardSkillsList.map((s, i) => <th key={`h-${i}`} className={`p-2 ${i===0?'border-l':''} ${i===hardSkillsList.length-1?'border-r':''} border-slate-200 text-center font-bold`}>{s.name}</th>)}
+                                {/* 动态渲染软素质表头 */}
+                                {softSkillsList.map((s, i) => <th key={`s-${i}`} className={`p-2 ${i===softSkillsList.length-1?'border-r':''} border-slate-200 text-center font-bold`}>{s.name}</th>)}
                                 <th></th>
                             </tr>
                           </thead>
                           <tbody>
                             {evs.map(ev => {
-                              const s = ev.scores || {};
                               return (
                               <tr key={ev.id} className="border-b border-slate-100 hover:bg-blue-50/60 transition-colors">
                                 <td className="p-4 font-mono text-xs text-slate-500 whitespace-nowrap">{ev.date}</td>
@@ -958,13 +968,10 @@
                                 <td className="p-4 text-center">
                                     <span className={`font-black px-4 py-1.5 rounded-lg text-sm shadow-sm ${['S','A'].includes(ev.rating) ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 text-white' : ev.rating === 'B' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white'}`}>{ev.rating}</span>
                                 </td>
-                                {/* 分数展示列 */}
-                                <td className="p-3 text-center border-l border-slate-100 text-sm font-bold text-slate-700 bg-blue-50/20">{s.aiTools || '-'}</td>
-                                <td className="p-3 text-center border-r border-slate-100 text-sm font-bold text-slate-700 bg-blue-50/20">{s.gameDecon || '-'}</td>
-                                <td className="p-3 text-center text-sm font-bold text-slate-700 bg-emerald-50/20">{s.aiAcc || '-'}</td>
-                                <td className="p-3 text-center text-sm font-bold text-slate-700 bg-emerald-50/20">{s.drive || '-'}</td>
-                                <td className="p-3 text-center text-sm font-bold text-slate-700 bg-emerald-50/20">{s.passion || '-'}</td>
-                                <td className="p-3 text-center border-r border-slate-100 text-sm font-bold text-slate-700 bg-emerald-50/20">{s.stress || '-'}</td>
+                                
+                                {/* 动态提取对应的分数，兼容遗留的旧版属性名 */}
+                                {hardSkillsList.map((s, i) => <td key={`h-d-${i}`} className={`p-3 text-center ${i===0?'border-l':''} ${i===hardSkillsList.length-1?'border-r':''} border-slate-100 text-sm font-bold text-slate-700 bg-blue-50/20`}>{getScoreForDisplay(ev.scores, s.name)}</td>)}
+                                {softSkillsList.map((s, i) => <td key={`s-d-${i}`} className={`p-3 text-center ${i===softSkillsList.length-1?'border-r':''} border-slate-100 text-sm font-bold text-slate-700 bg-emerald-50/20`}>{getScoreForDisplay(ev.scores, s.name)}</td>)}
                                 
                                 <td className="p-4 text-center whitespace-nowrap">
                                     <button onClick={() => setSelectedEval(ev)} className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold mr-2 transition-colors border-2 border-blue-600 shadow-sm"><i className="fa-solid fa-eye mr-1.5"></i>查看详细</button>
@@ -976,7 +983,7 @@
                         </table>
                       </div>
                     </div>
-                  ))
+                  )})
                 )}
               </div>
             )}
@@ -992,7 +999,7 @@
                      <h2 className="text-2xl font-black text-slate-800">显性硬技能区</h2>
                    </div>
                    
-                   <div className="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100 mb-6 shadow-inner">
+                   <div className="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100 mb-6 shadow-inner flex flex-col flex-shrink-0">
                      <h4 className="text-sm font-bold text-indigo-800 mb-3"><i className="fa-solid fa-plus-circle mr-1.5"></i>新增硬技能项</h4>
                      <input type="text" value={newHardSkillName} onChange={(e) => setNewHardSkillName(e.target.value)} placeholder="输入名称 (例: 海外买量漏斗分析)" className="w-full mb-3 border-2 border-white rounded-lg p-3 outline-none focus:border-indigo-400 font-bold shadow-sm" />
                      <textarea value={newHardSkillRubric} onChange={(e) => setNewHardSkillRubric(e.target.value)} placeholder="编写极其严苛的 1-5 分判断标准..." className="w-full mb-3 border-2 border-white rounded-lg p-3 h-24 outline-none focus:border-indigo-400 resize-y text-sm shadow-sm custom-scrollbar"></textarea>
@@ -1017,7 +1024,7 @@
                      <h2 className="text-2xl font-black text-slate-800">底层软素质区</h2>
                    </div>
                    
-                   <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 mb-6 shadow-inner">
+                   <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 mb-6 shadow-inner flex flex-col flex-shrink-0">
                      <h4 className="text-sm font-bold text-emerald-800 mb-3"><i className="fa-solid fa-plus-circle mr-1.5"></i>新增软素质项</h4>
                      <input type="text" value={newSoftSkillName} onChange={(e) => setNewSoftSkillName(e.target.value)} placeholder="输入名称 (例: 商业化同理心)" className="w-full mb-3 border-2 border-white rounded-lg p-3 outline-none focus:border-emerald-400 font-bold shadow-sm" />
                      <textarea value={newSoftSkillRubric} onChange={(e) => setNewSoftSkillRubric(e.target.value)} placeholder="编写极其严苛的 1-5 分判断标准..." className="w-full mb-3 border-2 border-white rounded-lg p-3 h-24 outline-none focus:border-emerald-400 resize-y text-sm shadow-sm custom-scrollbar"></textarea>
