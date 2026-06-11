@@ -65,7 +65,6 @@
       { id: 1, name: 'AI策划实习生 (默认严苛版)', description: '针对26届培养岗，重自驱与AI深度', skillIds: [1, 2, 3, 4, 5, 6, 7] }
     ];
 
-    // 核心重构：去除了死板的 Output Format，改在每次请求时动态生成
     const BASE_SYSTEM_PROMPT = `# Role\n你是一位就职于“北京贝塔科技”的资深游戏制作人兼主策划。任务是根据提供的【候选人简历】与【面试录音】，运用设定的【岗位素质模型】，客观、犀利、极度严格地评估候选人。\n\n# Task (核心纪律要求)\n1. 角色隔离防污染：绝不能将面试官的观点误认作候选人的产出。只评估独立表达内容！基于STAR法则深挖真实动机和卡点。\n2. 绝对客观防脑补：如果某项能力未提及或只有空洞套话，直接标记为“未识别”。必须有具体工具名、数据、卡点佐证。\n3. 严禁分数通胀：不轻易给5分！5分代表Top 5%的顶尖水平。必须有极具说服力的客观事实才能给4-5分。\n\n# 🧮 录用判定核心算法\n* 淘汰 (C)：显性技能中出现【较差】，或软素质中出现【1分/2分】。\n* 待定 (B)：统计所有“未识别”数量。如果【未识别】 > 1 个，触发熔断判定为待定。\n* 录用 (A/S)：未触碰红线且【未识别】 ≤ 1 个。且所有软素质 ≥ 3分。若两项以上5分则给S，否则给A。`;
 
     function App() {
@@ -116,9 +115,12 @@
       const [isTesting, setIsTesting] = useState(false);
       const [testResult, setTestResult] = useState(null); 
 
+      // 画像生成相关状态
       const [genPosName, setGenPosName] = useState('');
-      const [genHardSkills, setGenHardSkills] = useState('');
-      const [genSoftSkills, setGenSoftSkills] = useState('');
+      // 新增：用于接收判定标准文档内容
+      const [genDocContent, setGenDocContent] = useState('');
+      const [genDocFileName, setGenDocFileName] = useState('');
+      
       const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
       const [draftPosition, setDraftPosition] = useState(null); 
       const [refinePrompt, setRefinePrompt] = useState(''); 
@@ -306,16 +308,28 @@
         return { __html: marked.parse(text) };
       };
 
+      // 核心重构：直接读取用户上传的 JD 或评估标准文档进行结构化画像生成
       const generateInitialDraft = async () => {
-        if (!genPosName || !genHardSkills || !genSoftSkills) return showToast("请填写完整的岗位名称、硬技能和软素质！", "warning");
+        if (!genPosName) return showToast("请填写要创建的岗位名称！", "warning");
+        if (!genDocContent) return showToast("请上传您的《评估标准》文档或粘贴标准内容！", "warning");
+        
         setIsGeneratingDraft(true);
         try {
-          const sysPrompt = `你是一个资深HR架构师。根据用户提供的【岗位名称】、【硬技能】和【软素质】，生成符合“冰山模型”的评分标准。返回合法JSON对象，不要带任何markdown标记(不要用\`\`\`json包裹)：\n{ "name": "岗位名称", "description": "一句话描述", "skills": [ { "type": "hard或soft", "name": "...", "rubric": "* 4-5分：...\\n* 3分：...\\n* 1-2分：..." } ] }`;
-          const resText = await callLLM(sysPrompt, `岗位：${genPosName}\n硬技能：${genHardSkills}\n软素质：${genSoftSkills}`, 0.3, true);
+          const sysPrompt = `你是一个资深HR架构师。根据用户提供的【岗位名称】与【评估标准参考文档内容】，提取并构建符合“冰山模型”的评分标准。
+要求：
+1. 智能识别并提炼文档中的硬技能（显性能力）和软素质（隐性特质）。
+2. 如果文档中已经定义了具体的打分标准（如优秀/及格/较差，或1-5分界定），请严格遵循原文档的意思提取保留。
+3. 如果文档只写了技能名称而没有具体标准，请自动为其补充符合大厂要求、极其严苛的打分标准（rubric）。
+4. 必须返回合法JSON对象，不要带任何markdown标记(不要用\`\`\`json包裹)。
+格式要求：
+{ "name": "岗位名称", "description": "根据内容总结的一句话描述", "skills": [ { "type": "hard或soft", "name": "...", "rubric": "..." } ] }`;
+
+          const userPrompt = `【岗位名称】：${genPosName}\n\n【评估标准参考文档内容】：\n${genDocContent}`;
+          const resText = await callLLM(sysPrompt, userPrompt, 0.3, true);
           const cleanJson = resText.replace(/```json/gi, '').replace(/```/g, '').trim();
           setDraftPosition(JSON.parse(cleanJson));
-          showToast("初版画像评分标准生成成功！", "success");
-        } catch (err) { showToast("生成失败: " + err.message, "error"); } finally { setIsGeneratingDraft(false); }
+          showToast("文档解析完毕，画像评分标准提取成功！", "success");
+        } catch (err) { showToast("解析生成失败: " + err.message, "error"); } finally { setIsGeneratingDraft(false); }
       };
 
       const handleRefineDraft = async () => {
@@ -345,11 +359,13 @@
         });
         setSkills(updatedSkills);
         setPositions([...positions, { id: Date.now(), name: draftPosition.name, description: draftPosition.description, skillIds: newSkillIds }]);
-        setDraftPosition(null); setGenPosName(''); setGenHardSkills(''); setGenSoftSkills('');
+        setDraftPosition(null); 
+        setGenPosName(''); 
+        setGenDocContent(''); 
+        setGenDocFileName('');
         showToast(`画像《${draftPosition.name}》入库成功！`, "success");
       };
 
-      // 【核心重构 1】全动态构建评估标准，提取分数时根据选定岗位的技能名提取
       const generateReport = async () => {
         if (!candidateName) return showToast("请先填候选人姓名！", "warning");
         if (!resumeText && !interviewText) return showToast("请上传候选人简历与面试录音文件！", "warning");
@@ -359,7 +375,6 @@
         const posSkills = position.skillIds.map(id => skills.find(s => s.id === id)).filter(Boolean);
         const allSkillNames = posSkills.map(s => s.name);
         
-        // 动态构建大模型的输出表头结构，防止大模型胡编乱造列名
         let dynamicOutputFormat = `# Output Format\n请严格使用以下 Markdown 格式输出：\n\n### 📊 核心结论速览\n| 候选人姓名 | 最终判定 | ${allSkillNames.join(' | ')} | 未识别项数 | 核心评语 (限50字内) |\n| --- | --- | ${allSkillNames.map(()=>'---').join(' | ')} | --- | --- |\n| (提取姓名) | S/A/B/C | ${allSkillNames.map(()=>'(填写具体分数或未识别)').join(' | ')} | N | 简要总结 |\n\n---\n### 📝 详细评估报告 (佐证记录区)\n#### 👤 1. 候选人基本画像\n#### 🧊 2. 冰山之上：知识与技能评估\n#### 🌊 3. 冰山之下：软性素质评估\n#### 💡 4. 优劣势与风险提示\n#### 🏁 5. 综合决策复盘`;
 
         let dynamicRubric = `# 评估标准：${position.name}\n## 🧊 知识与技能\n`;
@@ -377,9 +392,8 @@
           const match = resText.match(/\|\s*S\/A\/B\/C\s*\|\s*([SABC])/i) || resText.match(/\|\s*([^|]+)\s*\|\s*([SABC])\s*\|/);
           setCurrentRating(match ? match[match.length - 1].toUpperCase() : 'B');
           
-          // 【核心重构 2】精准匹配表头，解析所有动态分数
           let extractedScores = {};
-          allSkillNames.forEach(name => extractedScores[name] = '-'); // 初始化全部为 -
+          allSkillNames.forEach(name => extractedScores[name] = '-'); 
 
           const lines = resText.split('\n');
           const headerLine = lines.find(line => line.includes('| 候选人姓名 |'));
@@ -413,23 +427,20 @@
             positionName: pos?.name || '未知', 
             rating: currentRating, 
             reportResult,
-            scores: currentParsedScores || {} // 保存被精准抓取的动态技能分数
+            scores: currentParsedScores || {} 
         }, ...evaluations]);
         showToast(`候选人 ${candidateName} 的记录已成功收录至台账！`, "success");
       };
 
-      // 向下兼容旧数据的帮助函数
       const getScoreForDisplay = (evScores, skillName) => {
           if (!evScores) return '-';
           if (evScores[skillName]) return evScores[skillName];
-          // 兼容之前的硬编码 key
           const legacyMap = { 'AI工具实操与落地': 'aiTools', '游戏系统/数值拆解': 'gameDecon', 'AI拥抱度与深度': 'aiAcc', '自驱力与落地精神': 'drive', '游戏热爱度': 'passion', '抗压韧性': 'stress' };
           if (legacyMap[skillName] && evScores[legacyMap[skillName]]) return evScores[legacyMap[skillName]];
           return '-';
       };
 
       const exportCSV = () => {
-        // 动态收集出现过的所有技能名称
         const allUniqueSkills = new Set();
         evaluations.forEach(ev => {
             if (ev.scores) {
@@ -475,7 +486,6 @@
         else if (type === 'eval') { setEvaluations(evaluations.filter(e => e.id !== id)); showToast("档案已删除。", "info");}
       };
 
-      // 档案库的分组逻辑
       const groupedEvaluations = evaluations.reduce((acc, ev) => {
           if (!acc[ev.positionName]) acc[ev.positionName] = [];
           acc[ev.positionName].push(ev);
@@ -540,8 +550,8 @@
                 <i className={`${iconClass} mr-2`}></i> {title}
               </span>
               <div className="flex space-x-2">
-                 <button onClick={() => setInputMode('file')} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${inputMode==='file'?'bg-indigo-100 font-bold text-indigo-700 border border-indigo-200':'text-gray-500 hover:bg-gray-200'}`}>一键传文档</button>
-                 <button onClick={() => setInputMode('text')} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${inputMode==='text'?'bg-indigo-100 font-bold text-indigo-700 border border-indigo-200':'text-gray-500 hover:bg-gray-200'}`}>手贴原文本</button>
+                 <button onClick={() => setInputMode('file')} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${inputMode==='file'?'bg-indigo-100 font-bold text-indigo-700 border border-indigo-200':'text-gray-500 hover:bg-gray-200'}`}>文档上传解析</button>
+                 <button onClick={() => setInputMode('text')} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${inputMode==='text'?'bg-indigo-100 font-bold text-indigo-700 border border-indigo-200':'text-gray-500 hover:bg-gray-200'}`}>手工粘贴</button>
               </div>
             </div>
             {inputMode === 'file' ? (
@@ -567,13 +577,13 @@
                   <label className="flex flex-col items-center justify-center h-full min-h-[140px] border-2 border-dashed border-blue-300 rounded-xl bg-blue-50/50 hover:bg-blue-100 hover:border-blue-500 cursor-pointer transition-all group w-full">
                     <input type="file" accept=".txt,.md,.pdf,.docx" className="hidden" onChange={handleUpload} />
                     <div className="w-14 h-14 bg-white rounded-full shadow-md flex items-center justify-center text-blue-600 mb-3 group-hover:scale-110 transition-transform group-hover:bg-blue-600 group-hover:text-white"><i className="fa-solid fa-arrow-up-from-bracket text-2xl"></i></div>
-                    <span className="text-base font-bold text-blue-700">点击此处一键上传文档</span>
-                    <span className="text-xs text-blue-400 mt-1.5 font-medium tracking-wide">支持无损解析 PDF、Word(docx)、TXT</span>
+                    <span className="text-base font-bold text-blue-700">点击此处上传文档文件</span>
+                    <span className="text-xs text-blue-400 mt-1.5 font-medium tracking-wide">支持 Word(docx)、PDF、TXT 解析</span>
                   </label>
                 )}
               </div>
             ) : (
-              <textarea value={textState} onChange={e => { setTextState(e.target.value); setFileNameState(''); }} placeholder="在此处粘贴纯文本内容..." className="w-full flex-1 min-h-[140px] p-4 rounded-xl border-2 border-gray-200 outline-none focus:border-blue-400 text-sm leading-relaxed custom-scrollbar bg-white resize-y" />
+              <textarea value={textState} onChange={e => { setTextState(e.target.value); setFileNameState(''); }} placeholder="若内容太长或无法上传，可在此直接粘贴文本内容..." className="w-full flex-1 min-h-[140px] p-4 rounded-xl border-2 border-gray-200 outline-none focus:border-blue-400 text-sm leading-relaxed custom-scrollbar bg-white resize-y" />
             )}
           </div>
         );
@@ -805,7 +815,6 @@
                         <button onClick={() => downloadWord(reportResult, `${candidateName}_评估报告`)} className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-bold text-sm shadow-md transition-all hover:-translate-y-0.5"><i className="fa-solid fa-file-word mr-2"></i> 下载原生 Word (.doc)</button>
                       </div>
                     </div>
-                    {/* 美化的呈现区块 */}
                     <div className="bg-slate-50/50 p-6 rounded-xl border border-slate-100 shadow-inner">
                        <div className="markdown-container" dangerouslySetInnerHTML={renderRichHTML(reportResult)}></div>
                     </div>
@@ -814,46 +823,57 @@
               </div>
             )}
 
-            {/* AI Copilot 画像生成与拼装 */}
+            {/* AI Copilot 画像生成与拼装：已升级为【文档解析式】 */}
             {activeTab === 'positions' && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="bg-slate-900 p-8 rounded-2xl shadow-2xl text-white relative overflow-hidden">
                    <div className="absolute -top-10 -right-10 opacity-10"><i className="fa-solid fa-wand-magic-sparkles text-[150px]"></i></div>
-                   <h2 className="text-2xl font-black mb-2 flex items-center relative z-10"><i className="fa-solid fa-wand-magic-sparkles mr-3 text-indigo-400"></i> AI Copilot 对话式画像生成器</h2>
-                   <p className="text-slate-400 text-sm mb-6 relative z-10">输入技能词汇，大模型自动生成严格 1-5 分判断标准。生成后可通过对话反复修改直至满意。</p>
+                   <h2 className="text-2xl font-black mb-2 flex items-center relative z-10"><i className="fa-solid fa-wand-magic-sparkles mr-3 text-indigo-400"></i> 极速画像解析引擎 (RAG)</h2>
+                   <p className="text-slate-400 text-sm mb-6 relative z-10">输入岗位名称，并直接上传您的《判定标准.docx》文档。大模型将智能抽离其中的冰山能力及评分细则，一键完成建库。</p>
+                   
                    {!draftPosition ? (
                      <div className="space-y-5 relative z-10">
-                       <input value={genPosName} onChange={e=>setGenPosName(e.target.value)} placeholder="输入要招聘的岗位名称 (例：资深海外买量)" className="w-full bg-slate-800/80 border-2 border-slate-700 rounded-xl p-4 outline-none focus:border-indigo-500 font-bold text-lg placeholder-slate-500 transition-colors" />
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                         <textarea value={genHardSkills} onChange={e=>setGenHardSkills(e.target.value)} placeholder="列出必须具备的硬技能 (用逗号分隔)\n例如: 投放漏斗拆解, A/B Test实操" className="w-full bg-slate-800/80 border-2 border-slate-700 rounded-xl p-4 h-28 outline-none focus:border-indigo-500 text-sm placeholder-slate-500 transition-colors"></textarea>
-                         <textarea value={genSoftSkills} onChange={e=>setGenSoftSkills(e.target.value)} placeholder="列出需要的软素质 (用逗号分隔)\n例如: 商业化同理心, 极致抗压力" className="w-full bg-slate-800/80 border-2 border-slate-700 rounded-xl p-4 h-28 outline-none focus:border-indigo-500 text-sm placeholder-slate-500 transition-colors"></textarea>
+                       <input value={genPosName} onChange={e=>setGenPosName(e.target.value)} placeholder="输入要招聘的岗位名称 (例如：资深海外数值策划)" className="w-full bg-slate-800/80 border-2 border-slate-700 rounded-xl p-4 outline-none focus:border-indigo-500 font-bold text-lg placeholder-slate-500 transition-colors" />
+                       
+                       <div className="h-64">
+                         <FileUploadZone 
+                            title="上传岗位JD或评估标准文档" 
+                            iconClass="fa-solid fa-file-word text-indigo-400 text-lg"
+                            textState={genDocContent} setTextState={setGenDocContent}
+                            fileNameState={genDocFileName} setFileNameState={setGenDocFileName}
+                         />
                        </div>
-                       <button onClick={generateInitialDraft} disabled={isGeneratingDraft} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-xl font-bold shadow-lg transition-all w-full md:w-auto text-lg flex items-center justify-center">
-                          {isGeneratingDraft ? <><i className="fa-solid fa-spinner fa-spin mr-3"></i> 正在构建极其严苛的标准中...</> : <><i className="fa-solid fa-bolt mr-3"></i> 一键生成初版评分标准</>}
-                       </button>
+
+                       <div className="flex justify-end pt-3">
+                         <button onClick={generateInitialDraft} disabled={isGeneratingDraft} className="bg-indigo-600 hover:bg-indigo-500 px-10 py-4 rounded-xl font-bold shadow-lg transition-all w-full md:w-auto text-lg flex items-center justify-center">
+                            {isGeneratingDraft ? <><i className="fa-solid fa-spinner fa-spin mr-3"></i> 智能研读并拆解文档中...</> : <><i className="fa-solid fa-microchip mr-3"></i> 一键提取并生成画像</>}
+                         </button>
+                       </div>
                      </div>
                    ) : (
                      <div className="bg-white text-slate-800 rounded-2xl p-6 shadow-2xl mt-4 border-t-8 border-indigo-500 relative z-10 animate-fadeInUp">
-                       <h3 className="text-xl font-black text-indigo-800 mb-4 border-b-2 border-slate-100 pb-3"><i className="fa-solid fa-square-check mr-2"></i> 请审核并调优草稿：{draftPosition.name}</h3>
+                       <h3 className="text-xl font-black text-indigo-800 mb-4 border-b-2 border-slate-100 pb-3"><i className="fa-solid fa-square-check mr-2"></i> 文档解析结果：{draftPosition.name}</h3>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 h-72 overflow-y-auto custom-scrollbar pr-3">
                          <div>
-                           <h4 className="font-bold text-blue-800 mb-3 bg-blue-50/80 p-2.5 rounded-lg border border-blue-100 sticky top-0 z-10 backdrop-blur-sm"><i className="fa-solid fa-microchip mr-2"></i> 🧊 冰山之上：硬技能界定</h4>
+                           <h4 className="font-bold text-blue-800 mb-3 bg-blue-50/80 p-2.5 rounded-lg border border-blue-100 sticky top-0 z-10 backdrop-blur-sm"><i className="fa-solid fa-microchip mr-2"></i> 🧊 提取的硬技能</h4>
                            {draftPosition.skills.filter(s=>s.type==='hard').map((s,i)=><div key={i} className="mb-4 pl-3 border-l-[3px] border-blue-400"><b className="text-sm font-bold">{s.name}</b><p className="text-xs text-slate-600 whitespace-pre-wrap mt-1.5 leading-relaxed bg-slate-50 p-2 rounded">{s.rubric}</p></div>)}
+                           {draftPosition.skills.filter(s=>s.type==='hard').length === 0 && <p className="text-sm text-gray-400 italic">未从文档中提取到硬技能...</p>}
                          </div>
                          <div>
-                           <h4 className="font-bold text-emerald-800 mb-3 bg-emerald-50/80 p-2.5 rounded-lg border border-emerald-100 sticky top-0 z-10 backdrop-blur-sm"><i className="fa-solid fa-heart mr-2"></i> 🌊 冰山之下：软素质界定</h4>
+                           <h4 className="font-bold text-emerald-800 mb-3 bg-emerald-50/80 p-2.5 rounded-lg border border-emerald-100 sticky top-0 z-10 backdrop-blur-sm"><i className="fa-solid fa-heart mr-2"></i> 🌊 提取的软素质</h4>
                            {draftPosition.skills.filter(s=>s.type==='soft').map((s,i)=><div key={i} className="mb-4 pl-3 border-l-[3px] border-emerald-400"><b className="text-sm font-bold">{s.name}</b><p className="text-xs text-slate-600 whitespace-pre-wrap mt-1.5 leading-relaxed bg-slate-50 p-2 rounded">{s.rubric}</p></div>)}
+                           {draftPosition.skills.filter(s=>s.type==='soft').length === 0 && <p className="text-sm text-gray-400 italic">未从文档中提取到软素质...</p>}
                          </div>
                        </div>
                        <div className="bg-slate-50 p-4 rounded-xl flex space-x-3 mb-5 border border-slate-200 shadow-sm">
-                         <input value={refinePrompt} onChange={e=>setRefinePrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefineDraft()} placeholder="觉得不够严苛？直接在这里提要求让 AI 局部修改" className="flex-1 border-2 border-slate-200 rounded-lg p-3 text-sm outline-none focus:border-indigo-500 bg-white" />
+                         <input value={refinePrompt} onChange={e=>setRefinePrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefineDraft()} placeholder="觉得解析不够准确？直接在这里对 AI 提出修改要求" className="flex-1 border-2 border-slate-200 rounded-lg p-3 text-sm outline-none focus:border-indigo-500 bg-white" />
                          <button onClick={handleRefineDraft} disabled={isRefining} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-indigo-600 transition-colors flex items-center">
                            {isRefining ? <i className="fa-solid fa-spinner fa-spin"></i> : <><i className="fa-solid fa-comment-dots mr-2"></i>让 AI 调整</>}
                          </button>
                        </div>
                        <div className="flex justify-end pt-4 border-t-2 border-slate-100">
-                         <button onClick={()=>setDraftPosition(null)} className="px-6 py-3 mr-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-colors">舍弃重做</button>
-                         <button onClick={confirmAndSaveDraft} className="px-8 py-3 bg-indigo-600 text-white font-black rounded-xl shadow-md hover:bg-indigo-700 transition-all hover:-translate-y-0.5"><i className="fa-solid fa-download mr-2"></i> 极其满意，拆解并入库</button>
+                         <button onClick={()=>setDraftPosition(null)} className="px-6 py-3 mr-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-colors">取消</button>
+                         <button onClick={confirmAndSaveDraft} className="px-8 py-3 bg-indigo-600 text-white font-black rounded-xl shadow-md hover:bg-indigo-700 transition-all hover:-translate-y-0.5"><i className="fa-solid fa-download mr-2"></i> 确认提取内容，拆解并入库</button>
                        </div>
                      </div>
                    )}
@@ -919,7 +939,6 @@
                   </div>
                 ) : (
                   Object.entries(groupedEvaluations).map(([posName, evs]) => {
-                    // 【核心重构】针对每个岗位，动态提取其需要的硬技能和软素质作为表头
                     const posDef = positions.find(p => p.name === posName);
                     let hardSkillsList = [];
                     let softSkillsList = [];
@@ -927,7 +946,6 @@
                       hardSkillsList = posDef.skillIds.map(id => skills.find(s => s.id === id)).filter(s => s && s.type === 'hard');
                       softSkillsList = posDef.skillIds.map(id => skills.find(s => s.id === id)).filter(s => s && s.type === 'soft');
                     } else if (evs.length > 0 && evs[0].scores) {
-                      // 兜底方案：如果岗位被删除了，回退遍历其分数key
                       hardSkillsList = Object.keys(evs[0].scores).map(name => ({ id: name, name: name }));
                     }
 
@@ -944,17 +962,13 @@
                                 <th className="p-4 whitespace-nowrap font-bold">评估日期</th>
                                 <th className="p-4 whitespace-nowrap font-bold">候选人</th>
                                 <th className="p-4 whitespace-nowrap text-center font-bold">最终判定</th>
-                                {/* 动态合并硬技能列 */}
                                 {hardSkillsList.length > 0 && <th className="p-4 border-l border-r border-white bg-blue-50/50 text-center font-bold" colSpan={hardSkillsList.length}>🧊 核心硬技能</th>}
-                                {/* 动态合并软素质列 */}
                                 {softSkillsList.length > 0 && <th className="p-4 border-r border-white bg-emerald-50/50 text-center font-bold" colSpan={softSkillsList.length}>🌊 软性素质</th>}
                                 <th className="p-4 text-center whitespace-nowrap font-bold">档案操作</th>
                             </tr>
                             <tr className="text-[11px] text-slate-500 bg-slate-50 tracking-wider">
                                 <th></th><th></th><th></th>
-                                {/* 动态渲染硬技能表头 */}
                                 {hardSkillsList.map((s, i) => <th key={`h-${i}`} className={`p-2 ${i===0?'border-l':''} ${i===hardSkillsList.length-1?'border-r':''} border-slate-200 text-center font-bold`}>{s.name}</th>)}
-                                {/* 动态渲染软素质表头 */}
                                 {softSkillsList.map((s, i) => <th key={`s-${i}`} className={`p-2 ${i===softSkillsList.length-1?'border-r':''} border-slate-200 text-center font-bold`}>{s.name}</th>)}
                                 <th></th>
                             </tr>
@@ -969,7 +983,6 @@
                                     <span className={`font-black px-4 py-1.5 rounded-lg text-sm shadow-sm ${['S','A'].includes(ev.rating) ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 text-white' : ev.rating === 'B' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white'}`}>{ev.rating}</span>
                                 </td>
                                 
-                                {/* 动态提取对应的分数，兼容遗留的旧版属性名 */}
                                 {hardSkillsList.map((s, i) => <td key={`h-d-${i}`} className={`p-3 text-center ${i===0?'border-l':''} ${i===hardSkillsList.length-1?'border-r':''} border-slate-100 text-sm font-bold text-slate-700 bg-blue-50/20`}>{getScoreForDisplay(ev.scores, s.name)}</td>)}
                                 {softSkillsList.map((s, i) => <td key={`s-d-${i}`} className={`p-3 text-center ${i===softSkillsList.length-1?'border-r':''} border-slate-100 text-sm font-bold text-slate-700 bg-emerald-50/20`}>{getScoreForDisplay(ev.scores, s.name)}</td>)}
                                 
